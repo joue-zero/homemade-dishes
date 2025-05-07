@@ -34,4 +34,12 @@ public class DishController {
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    //get dishes by dish id
+    @GetMapping("/{id}")
+    public ResponseEntity<Dish> getDishById(@PathVariable Long id) {
+        return dishRepository.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 } 

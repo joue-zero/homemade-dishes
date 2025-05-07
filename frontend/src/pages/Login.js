@@ -26,9 +26,9 @@ const Login = () => {
 
     try {
       const response = await authService.login(formData);
-      console.log(response);
+      console.log('Login response:', response);
       
-      // Store both token and user ID
+      // Store both token and user ID with consistent keys
       localStorage.setItem('token', response.token);
       localStorage.setItem('userId', response.id);
       navigate('/dishes');
@@ -46,15 +46,15 @@ const Login = () => {
         {error && <div className="error-message">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="username">Username</label>
             <input
               type="text"
-              id="email"
+              id="username"
               name="username"
-              value={formData.email}
+              value={formData.username}
               onChange={handleChange}
               required
-              placeholder="Enter your email"
+              placeholder="Enter your username"
             />
           </div>
           <div className="form-group">

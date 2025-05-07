@@ -15,6 +15,7 @@ const OrderHistory = () => {
         try {
             const response = await orderService.getUserOrders();
             setOrders(response);
+            console.log(response);
         } catch (err) {
             setError(err.message || 'Failed to fetch orders');
         } finally {
@@ -85,7 +86,7 @@ const OrderHistory = () => {
                                 <div key={item.id} className="order-item">
                                     <span className="item-name">{item.dishName}</span>
                                     <span className="item-quantity">x{item.quantity}</span>
-                                    <span className="item-price">${item.price.toFixed(2)}</span>
+                                    {/* <span className="item-price">${item.totalAmount.toFixed(2)}</span> */}
                                 </div>
                             ))}
                         </div>

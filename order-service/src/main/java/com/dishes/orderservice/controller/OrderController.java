@@ -5,6 +5,8 @@ import com.dishes.orderservice.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
@@ -12,6 +14,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
+    private static final Logger logger = LoggerFactory.getLogger(OrderController.class);
 
     @Autowired
     private OrderService orderService;
@@ -20,7 +23,16 @@ public class OrderController {
     public ResponseEntity<Order> createOrder(
             @RequestHeader("X-User-Id") Long userId,
             @RequestBody List<Map<String, Object>> items) {
-        return ResponseEntity.ok(orderService.createOrder(userId, items));
+        logger.info("Received order creation request for user: {}", userId);
+        logger.info("Order items: {}", items);
+        try {
+            Order order = orderService.createOrder(userId, items);
+            logger.info("Order created successfully: {}", order);
+            return ResponseEntity.ok(order);
+        } catch (Exception e) {
+            logger.error("Error creating order", e);
+            throw e;
+        }
     }
 
     @GetMapping
