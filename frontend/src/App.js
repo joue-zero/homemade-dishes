@@ -9,26 +9,15 @@ import Register from './pages/Register';
 import Admin from './pages/Admin';
 import CompanyLogin from './pages/CompanyLogin';
 import CompanyDashboard from './pages/CompanyDashboard';
+import Navbar from './components/Navbar';
 import './App.css';
 
 function App() {
     return (
         <Router>
             <div className="app">
-                <nav>
-                    <ul>
-                        <li><Link to="/">Home</Link></li>
-                        <li><Link to="/dishes">Dishes</Link></li>
-                        <li><Link to="/orders">Orders</Link></li>
-                        <li><Link to="/profile">Profile</Link></li>
-                        <li><Link to="/login">Login</Link></li>
-                        <li><Link to="/register">Register</Link></li>
-                        <li><Link to="/admin">Admin</Link></li>
-                        <li><Link to="/company/login">Company Login</Link></li>
-                    </ul>
-                </nav>
-
-                <main>
+                <Navbar />
+                <main className="main-content">
                     <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/dishes" element={<Dishes />} />
