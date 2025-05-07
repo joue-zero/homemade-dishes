@@ -3,6 +3,7 @@ package com.dishes.dishservice.model;
 import lombok.Data;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @Entity
@@ -22,16 +23,32 @@ public class Dish {
     private BigDecimal price;
 
     @Column(nullable = false)
-    @Enumerated(EnumType.STRING)
-    private Category category;
+    private String category;
 
-    @Column(name = "image_url")
+    @Column
     private String imageUrl;
 
     @Column(nullable = false)
     private boolean available;
 
-    public enum Category {
-        PIZZA, BURGER, SALAD, DESSERT, PASTA
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 } 
