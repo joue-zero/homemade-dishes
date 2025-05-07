@@ -82,11 +82,11 @@ const OrderHistory = () => {
                             </div>
                         </div>
                         <div className="order-items">
-                            {order.orderItems.map(item => (
+                            {order.items.map(item => (
                                 <div key={item.id} className="order-item">
                                     <span className="item-name">{item.dishName}</span>
                                     <span className="item-quantity">x{item.quantity}</span>
-                                    {/* <span className="item-price">${item.totalAmount.toFixed(2)}</span> */}
+                                    <span className="item-price">${Math.round(item.price * item.quantity)}</span>
                                 </div>
                             ))}
                         </div>

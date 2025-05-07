@@ -132,6 +132,23 @@
   margin-bottom: 1rem;
 }
 
+.no-dishes {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.dish-company {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
 @media (max-width: 1024px) {
   .dishes-page {
     grid-template-columns: 1fr;

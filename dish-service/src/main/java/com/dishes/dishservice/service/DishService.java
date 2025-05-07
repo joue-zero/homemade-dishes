@@ -35,7 +35,7 @@ public class DishService {
         existingDish.setName(dish.getName());
         existingDish.setDescription(dish.getDescription());
         existingDish.setPrice(dish.getPrice());
-        existingDish.setAvailable(dish.isAvailable());
+        existingDish.setAvailable(dish.getAvailable());
         existingDish.setCompany(dish.getCompany());
         return dishRepository.save(existingDish);
     }

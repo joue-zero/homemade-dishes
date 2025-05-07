@@ -34,21 +34,19 @@ public class OrderService {
         Order order = new Order();
         order.setUserId(userId);
         order.setStatus(Order.OrderStatus.PENDING);
-        order.setOrderItems(new ArrayList<>());
-
+        
+        List<OrderItem> orderItems = new ArrayList<>();
         double totalAmount = 0.0;
 
         for (Map<String, Object> item : items) {
             try {
                 Long dishId = Long.valueOf(item.get("dishId").toString());
-                int quantity = Integer.parseInt(item.get("quantity").toString());
+                Integer quantity = Integer.valueOf(item.get("quantity").toString());
                 logger.info("Processing dish: id={}, quantity={}", dishId, quantity);
 
-                // Fetch dish details from dish service
-                DishDTO dish = restTemplate.getForObject(
-                    DISH_SERVICE_URL + "/" + dishId,
-                    DishDTO.class
-                );
+                // Get dish details from dish service
+                String dishServiceUrl = DISH_SERVICE_URL + "/" + dishId;
+                DishDTO dish = restTemplate.getForObject(dishServiceUrl, DishDTO.class);
 
                 if (dish == null) {
                     logger.error("Dish not found with id: {}", dishId);
@@ -61,14 +59,13 @@ public class OrderService {
                 }
 
                 OrderItem orderItem = new OrderItem();
-                orderItem.setOrder(order);
                 orderItem.setDishId(dishId);
                 orderItem.setDishName(dish.getName());
                 orderItem.setPrice(dish.getPrice().doubleValue());
                 orderItem.setQuantity(quantity);
                 orderItem.setSubtotal(dish.getPrice().doubleValue() * quantity);
-
-                order.getOrderItems().add(orderItem);
+                orderItem.setOrder(order);
+                orderItems.add(orderItem);
                 totalAmount += orderItem.getSubtotal();
                 logger.info("Added item to order: {}", orderItem);
             } catch (Exception e) {
@@ -77,6 +74,11 @@ public class OrderService {
             }
         }
 
+        if (orderItems.isEmpty()) {
+            throw new RuntimeException("No valid items in the order");
+        }
+
+        order.setItems(orderItems);
         order.setTotalAmount(totalAmount);
         logger.info("Saving order with total amount: {}", totalAmount);
         return orderRepository.save(order);
@@ -101,8 +103,8 @@ public class OrderService {
     @Transactional
     public void cancelOrder(Long orderId) {
         Order order = getOrder(orderId);
-        if (order.getStatus() == Order.OrderStatus.COMPLETED) {
-            throw new RuntimeException("Cannot cancel a completed order");
+        if (order.getStatus() == Order.OrderStatus.DELIVERED) {
+            throw new RuntimeException("Cannot cancel a delivered order");
         }
         order.setStatus(Order.OrderStatus.CANCELLED);
         orderRepository.save(order);

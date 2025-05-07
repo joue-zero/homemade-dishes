@@ -15,11 +15,35 @@ const Dishes = () => {
 
   const fetchDishes = async () => {
     try {
+      setLoading(true);
       const data = await dishService.getAllDishes();
-      setDishes(data);
+      // Handle the circular reference by extracting unique dishes
+      const uniqueDishes = Array.isArray(data) ? data.map(dish => ({
+        id: dish.id,
+        name: dish.name,
+        description: dish.description,
+        price: dish.price,
+        category: dish.category,
+        imageUrl: dish.imageUrl,
+        available: dish.available,
+        companyId: dish.company?.id,
+        companyName: dish.company?.name
+      })) : [];
+      
+      // Remove duplicates based on dish ID
+      const uniqueDishesMap = new Map();
+      uniqueDishes.forEach(dish => {
+        if (!uniqueDishesMap.has(dish.id)) {
+          uniqueDishesMap.set(dish.id, dish);
+        }
+      });
+      
+      setDishes(Array.from(uniqueDishesMap.values()));
       setError('');
     } catch (err) {
+      console.error('Error fetching dishes:', err);
       setError('Failed to fetch dishes. Please try again.');
+      setDishes([]);
     } finally {
       setLoading(false);
     }
@@ -56,27 +80,32 @@ const Dishes = () => {
       <div className="dishes-container">
         <h1>Available Dishes</h1>
         <div className="dishes-grid">
-          {dishes.map(dish => (
-            <div key={dish.id} className="dish-card">
-              {dish.imageUrl && (
-                <img src={dish.imageUrl} alt={dish.name} className="dish-image" />
-              )}
-              <div className="dish-info">
-                <h3>{dish.name}</h3>
-                <p className="dish-description">{dish.description}</p>
-                <div className="dish-footer">
-                  <span className="dish-price">${dish.price.toFixed(2)}</span>
-                  <button
-                    className="add-to-cart"
-                    onClick={() => handleAddToCart(dish)}
-                    disabled={!dish.available}
-                  >
-                    {dish.available ? 'Add to Cart' : 'Not Available'}
-                  </button>
+          {dishes && dishes.length > 0 ? (
+            dishes.map(dish => (
+              <div key={dish.id} className="dish-card">
+                {dish.imageUrl && (
+                  <img src={dish.imageUrl} alt={dish.name} className="dish-image" />
+                )}
+                <div className="dish-info">
+                  <h3>{dish.name}</h3>
+                  <p className="dish-description">{dish.description}</p>
+                  <p className="dish-company">By: {dish.companyName}</p>
+                  <div className="dish-footer">
+                    <span className="dish-price">${dish.price.toFixed(2)}</span>
+                    <button
+                      className="add-to-cart"
+                      onClick={() => handleAddToCart(dish)}
+                      disabled={!dish.available}
+                    >
+                      {dish.available ? 'Add to Cart' : 'Not Available'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="no-dishes">No dishes available at the moment.</div>
+          )}
         </div>
       </div>
       <div className="cart-container">

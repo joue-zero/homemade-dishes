@@ -1,5 +1,6 @@
 package com.dishes.dishservice.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import lombok.Data;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -16,29 +17,28 @@ public class Dish {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
+    @Column(length = 1000)
     private String description;
 
     @Column(nullable = false)
-    private BigDecimal price;
+    private Double price;
 
-    @Column(nullable = false)
     private String category;
 
-    @Column
     private String imageUrl;
 
     @Column(nullable = false)
-    private boolean available;
+    private Boolean available = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "company_id", nullable = false)
+    @JoinColumn(name = "company_id")
+    @JsonBackReference
     private Company company;
 
-    @Column(nullable = false)
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist
