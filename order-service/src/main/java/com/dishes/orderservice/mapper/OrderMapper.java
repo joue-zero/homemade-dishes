@@ -17,7 +17,7 @@ public class OrderMapper {
         OrderDTO dto = new OrderDTO();
         dto.setId(order.getId());
         dto.setStatus(order.getStatus().toString());
-        dto.setTotalAmount(order.getTotalAmount());
+        dto.setTotalAmount(order.getTotalAmount().doubleValue());
         dto.setCreatedAt(order.getCreatedAt());
         dto.setUpdatedAt(order.getUpdatedAt());
 
@@ -27,9 +27,9 @@ public class OrderMapper {
                 .collect(Collectors.toList()));
 
         // Map user (only ID for now, as we don't have user details in the order)
-        if (order.getUserId() != null) {
+        if (order.getCustomerId() != null) {
             OrderDTO.UserDTO userDTO = new OrderDTO.UserDTO();
-            userDTO.setId(order.getUserId());
+            userDTO.setId(order.getCustomerId());
             dto.setUser(userDTO);
         }
 

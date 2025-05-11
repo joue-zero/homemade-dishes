@@ -1,6 +1,5 @@
 package com.dishes.dishservice.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import lombok.Data;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -30,10 +29,8 @@ public class Dish {
     @Column(nullable = false)
     private Boolean available = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "company_id")
-    @JsonBackReference
-    private Company company;
+    @Column(name = "seller_id")
+    private Long sellerId;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

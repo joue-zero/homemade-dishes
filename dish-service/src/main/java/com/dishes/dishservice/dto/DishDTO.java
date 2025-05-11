@@ -11,14 +11,5 @@ public class DishDTO {
     private String category;
     private String imageUrl;
     private Boolean available;
-    private CompanyDTO company;
-
-    @Data
-    public static class CompanyDTO {
-        private Long id;
-        private String name;
-        private String email;
-        private String phone;
-        private String address;
-    }
+    private Long sellerId;
 } 

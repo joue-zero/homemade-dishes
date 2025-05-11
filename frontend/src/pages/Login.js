@@ -31,7 +31,16 @@ const Login = () => {
       // Store both token and user ID with consistent keys
       localStorage.setItem('token', response.token);
       localStorage.setItem('userId', response.id);
-      navigate('/dishes');
+      localStorage.setItem('userRole', response.role); // Store the role
+
+      // Redirect based on role
+      if (response.role === 'SELLER') {
+        navigate('/seller-dashboard');
+      } else if (response.role === 'ADMIN') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/dishes');
+      }
     } catch (err) {
       setError(err.message || 'Failed to login. Please try again.');
     } finally {

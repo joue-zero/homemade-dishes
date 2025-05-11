@@ -22,8 +22,8 @@ public class DishService {
                 .orElseThrow(() -> new RuntimeException("Dish not found"));
     }
 
-    public List<Dish> getDishesByCompany(Long companyId) {
-        return dishRepository.findByCompanyId(companyId);
+    public List<Dish> getDishesBySeller(Long sellerId) {
+        return dishRepository.findBySellerId(sellerId);
     }
 
     public Dish createDish(Dish dish) {
@@ -36,7 +36,7 @@ public class DishService {
         existingDish.setDescription(dish.getDescription());
         existingDish.setPrice(dish.getPrice());
         existingDish.setAvailable(dish.getAvailable());
-        existingDish.setCompany(dish.getCompany());
+        existingDish.setSellerId(dish.getSellerId());
         return dishRepository.save(existingDish);
     }
 

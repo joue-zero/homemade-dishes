@@ -19,7 +19,7 @@ const getAuthHeader = () => {
 export const orderService = {
     createOrder: async (items) => {
         try {
-            const response = await axios.post(API_URL, items, getAuthHeader());
+            const response = await axios.post(`${API_URL}/user-order`, items, getAuthHeader());
             return response.data;
         } catch (error) {
             throw error.response?.data || error.message;

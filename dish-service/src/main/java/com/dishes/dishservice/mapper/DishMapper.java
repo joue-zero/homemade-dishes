@@ -20,16 +20,7 @@ public class DishMapper {
         dto.setCategory(dish.getCategory());
         dto.setImageUrl(dish.getImageUrl());
         dto.setAvailable(dish.getAvailable());
-
-        if (dish.getCompany() != null) {
-            DishDTO.CompanyDTO companyDTO = new DishDTO.CompanyDTO();
-            companyDTO.setId(dish.getCompany().getId());
-            companyDTO.setName(dish.getCompany().getName());
-            companyDTO.setEmail(dish.getCompany().getEmail());
-            companyDTO.setPhone(dish.getCompany().getPhone());
-            companyDTO.setAddress(dish.getCompany().getAddress());
-            dto.setCompany(companyDTO);
-        }
+        dto.setSellerId(dish.getSellerId());
 
         return dto;
     }
@@ -47,6 +38,7 @@ public class DishMapper {
         dish.setCategory(dto.getCategory());
         dish.setImageUrl(dto.getImageUrl());
         dish.setAvailable(dto.getAvailable());
+        dish.setSellerId(dto.getSellerId());
 
         return dish;
     }

@@ -11,6 +11,7 @@ import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,43 +32,68 @@ public class OrderService {
         logger.info("Creating order for user: {}", userId);
         logger.info("Order items: {}", items);
 
+        if (userId == null) {
+            logger.error("User ID cannot be null");
+            throw new RuntimeException("User ID cannot be null");
+        }
+
+        if (items == null || items.isEmpty()) {
+            logger.error("Order must contain at least one item");
+            throw new RuntimeException("Order must contain at least one item");
+        }
+
         Order order = new Order();
-        order.setUserId(userId);
+        order.setCustomerId(userId);
         order.setStatus(Order.OrderStatus.PENDING);
         
         List<OrderItem> orderItems = new ArrayList<>();
-        double totalAmount = 0.0;
+        BigDecimal totalAmount = BigDecimal.ZERO;
 
         for (Map<String, Object> item : items) {
             try {
+                if (item.get("dishId") == null) {
+                    logger.error("Missing dishId in item: {}", item);
+                    throw new RuntimeException("Missing dishId in order item");
+                }
+                
+                if (item.get("quantity") == null) {
+                    logger.error("Missing quantity in item: {}", item);
+                    throw new RuntimeException("Missing quantity in order item");
+                }
+                
                 Long dishId = Long.valueOf(item.get("dishId").toString());
                 Integer quantity = Integer.valueOf(item.get("quantity").toString());
                 logger.info("Processing dish: id={}, quantity={}", dishId, quantity);
 
                 // Get dish details from dish service
                 String dishServiceUrl = DISH_SERVICE_URL + "/" + dishId;
-                DishDTO dish = restTemplate.getForObject(dishServiceUrl, DishDTO.class);
+                try {
+                    DishDTO dish = restTemplate.getForObject(dishServiceUrl, DishDTO.class);
 
-                if (dish == null) {
-                    logger.error("Dish not found with id: {}", dishId);
-                    throw new RuntimeException("Dish not found with id: " + dishId);
+                    if (dish == null) {
+                        logger.error("Dish not found with id: {}", dishId);
+                        throw new RuntimeException("Dish not found with id: " + dishId);
+                    }
+
+                    if (!dish.isAvailable()) {
+                        logger.error("Dish is not available: {}", dish.getName());
+                        throw new RuntimeException("Dish is not available: " + dish.getName());
+                    }
+
+                    OrderItem orderItem = new OrderItem();
+                    orderItem.setDishId(dishId);
+                    orderItem.setDishName(dish.getName());
+                    orderItem.setPrice(dish.getPrice().doubleValue());
+                    orderItem.setQuantity(quantity);
+                    orderItem.setSubtotal(dish.getPrice().doubleValue() * quantity);
+                    orderItem.setOrder(order);
+                    orderItems.add(orderItem);
+                    totalAmount = totalAmount.add(BigDecimal.valueOf(orderItem.getSubtotal()));
+                    logger.info("Added item to order: {}", orderItem);
+                } catch (Exception e) {
+                    logger.error("Error fetching dish from dish service: {}", e.getMessage(), e);
+                    throw new RuntimeException("Error fetching dish details: " + e.getMessage());
                 }
-
-                if (!dish.isAvailable()) {
-                    logger.error("Dish is not available: {}", dish.getName());
-                    throw new RuntimeException("Dish is not available: " + dish.getName());
-                }
-
-                OrderItem orderItem = new OrderItem();
-                orderItem.setDishId(dishId);
-                orderItem.setDishName(dish.getName());
-                orderItem.setPrice(dish.getPrice().doubleValue());
-                orderItem.setQuantity(quantity);
-                orderItem.setSubtotal(dish.getPrice().doubleValue() * quantity);
-                orderItem.setOrder(order);
-                orderItems.add(orderItem);
-                totalAmount += orderItem.getSubtotal();
-                logger.info("Added item to order: {}", orderItem);
             } catch (Exception e) {
                 logger.error("Error processing order item: {}", item, e);
                 throw new RuntimeException("Error processing order item: " + e.getMessage());
@@ -85,7 +111,7 @@ public class OrderService {
     }
 
     public List<Order> getUserOrders(Long userId) {
-        return orderRepository.findByUserId(userId);
+        return orderRepository.findByCustomerId(userId);
     }
 
     public Order getOrder(Long orderId) {
@@ -103,10 +129,23 @@ public class OrderService {
     @Transactional
     public void cancelOrder(Long orderId) {
         Order order = getOrder(orderId);
-        if (order.getStatus() == Order.OrderStatus.DELIVERED) {
-            throw new RuntimeException("Cannot cancel a delivered order");
+        if (order.getStatus() == Order.OrderStatus.COMPLETED) {
+            throw new RuntimeException("Cannot cancel a completed order");
         }
         order.setStatus(Order.OrderStatus.CANCELLED);
         orderRepository.save(order);
+    }
+
+    public List<Order> getOrdersBySeller(Long sellerId) {
+        return orderRepository.findBySellerId(sellerId);
+    }
+
+    public List<Order> getOrdersByCustomer(Long customerId) {
+        return orderRepository.findByCustomerId(customerId);
+    }
+
+    @Transactional
+    public Order createOrder(Order order) {
+        return orderRepository.save(order);
     }
 } 

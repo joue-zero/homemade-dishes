@@ -40,4 +40,14 @@ public class UserController {
                 .orElse(ResponseEntity.notFound().build());
     }
     
+    // DELETE endpoint that accepts POST method for deleting users
+    @PostMapping("/delete/{userId}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
+        if (userRepository.existsById(userId)) {
+            userRepository.deleteById(userId);
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
 } 
