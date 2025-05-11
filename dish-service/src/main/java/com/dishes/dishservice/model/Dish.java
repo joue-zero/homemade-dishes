@@ -22,8 +22,10 @@ public class Dish {
     @Column(nullable = false)
     private Double price;
 
+    @Column(name = "category")
     private String category;
 
+    @Column(name = "image_url")
     private String imageUrl;
 
     @Column(nullable = false)

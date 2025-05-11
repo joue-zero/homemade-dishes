@@ -74,10 +74,21 @@ const SellerDashboard = () => {
     const fetchDishes = async () => {
         setLoading(prev => ({ ...prev, dishes: true }));
         try {
-            const userId = localStorage.getItem('userId');
-            const response = await axios.get(`http://localhost:8082/api/sellers/${userId}/dishes`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-            });
+            const userId = localStorage.getItem('userId') || '1'; // Fallback to ID 1 if not found
+            
+            // Create headers with or without token
+            const headers = {};
+            const token = localStorage.getItem('token');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            const response = await axios.get(
+                `http://localhost:8082/api/sellers/${userId}/dishes`, 
+                { headers }
+            );
+            
+            console.log("Fetched dishes:", response.data);
             setDishes(response.data);
             setError(null);
         } catch (error) {
@@ -194,12 +205,32 @@ const SellerDashboard = () => {
     const handleCreateDish = async (e) => {
         e.preventDefault();
         try {
-            const userId = localStorage.getItem('userId');
+            const userId = localStorage.getItem('userId') || '1'; // Fallback to ID 1 if not found
+            
+            // Format the dish data correctly
+            const formattedDish = {
+                ...newDish,
+                price: parseFloat(newDish.price),
+                quantity: newDish.quantity ? parseInt(newDish.quantity) : null
+            };
+            
+            console.log("Creating dish:", formattedDish);
+            
+            // Create headers with or without token
+            const headers = {};
+            const token = localStorage.getItem('token');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
             const response = await axios.post(
                 `http://localhost:8082/api/sellers/${userId}/dishes`,
-                newDish,
-                { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+                formattedDish,
+                { headers }
             );
+            
+            console.log("Create dish response:", response.data);
+            
             setDishes([...dishes, response.data]);
             setNewDish({
                 name: '',
@@ -218,27 +249,71 @@ const SellerDashboard = () => {
     };
 
     const handleEditDish = (dish) => {
-        setEditingDish({
+        const dishToEdit = {
             ...dish,
             price: dish.price.toString(),
             quantity: dish.quantity ? dish.quantity.toString() : ''
-        });
+        };
+        console.log("Setting dish for editing:", dishToEdit);
+        console.log("Original quantity:", dish.quantity, "Converted quantity:", dishToEdit.quantity);
+        console.log("Original category:", dish.category);
+        setEditingDish(dishToEdit);
     };
+
+    // Add a useEffect to monitor the editingDish state
+    useEffect(() => {
+        if (editingDish) {
+            console.log("Current editingDish state:", editingDish);
+        }
+    }, [editingDish]);
 
     const handleUpdateDish = async (e) => {
         e.preventDefault();
         try {
-            const userId = localStorage.getItem('userId');
-            console.log(editingDish);
+            const userId = localStorage.getItem('userId') || '1'; // Fallback to ID 1 if not found
+            
+            // Log the dish being updated
+            console.log("Updating dish raw form state:", editingDish);
+            
+            // Convert price and quantity to appropriate formats and ensure all fields are properly formatted
+            const updatedDish = {
+                id: editingDish.id,
+                name: editingDish.name,
+                description: editingDish.description,
+                price: parseFloat(editingDish.price),
+                category: editingDish.category,
+                imageUrl: editingDish.imageUrl,
+                available: editingDish.available,
+                quantity: editingDish.quantity ? parseInt(editingDish.quantity) : null,
+                sellerId: parseInt(userId)
+            };
+            
+            console.log("Formatted dish data:", updatedDish);
+            console.log("Specifically checking category:", updatedDish.category);
+            console.log("Specifically checking quantity:", updatedDish.quantity);
+            
+            // Create headers with or without token
+            const headers = {};
+            const token = localStorage.getItem('token');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
             
             const response = await axios.put(
-                `http://localhost:8082/api/sellers/${userId}/dishes/${editingDish.id}`,
-                editingDish,
-                { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+                `http://localhost:8082/api/sellers/${userId}/dishes/${updatedDish.id}`,
+                updatedDish,
+                { headers }
             );
+            
+            console.log("Update response:", response.data);
+            console.log("Response category:", response.data.category);
+            console.log("Response quantity:", response.data.quantity);
+            
+            // Update the dishes state with the updated dish
             setDishes(dishes.map(dish => 
-                dish.id === editingDish.id ? response.data : dish
+                dish.id === updatedDish.id ? response.data : dish
             ));
+            
             setEditingDish(null);
             setError(null);
         } catch (error) {
@@ -253,12 +328,23 @@ const SellerDashboard = () => {
 
     const handleToggleAvailability = async (dishId, currentStatus) => {
         try {
-            const userId = localStorage.getItem('userId');
+            const userId = localStorage.getItem('userId') || '1'; // Fallback to ID 1 if not found
+            
+            // Create headers with or without token
+            const headers = {};
+            const token = localStorage.getItem('token');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
             const response = await axios.put(
-                `http://localhost:8082/api/sellers/${userId}/dishes/${dishId}/availability`,
-                { available: !currentStatus },
-                { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }
+                `http://localhost:8082/api/sellers/${userId}/dishes/${dishId}/availability?available=${!currentStatus}`,
+                null, // No body needed as it's in the query parameter
+                { headers }
             );
+            
+            console.log("Toggle availability response:", response.data);
+            
             setDishes(dishes.map(dish => 
                 dish.id === dishId ? response.data : dish
             ));
