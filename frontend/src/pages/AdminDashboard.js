@@ -8,8 +8,7 @@ const AdminDashboard = () => {
     const [sellers, setSellers] = useState([]);
     const [newSeller, setNewSeller] = useState({
         username: '',
-        password: '',
-        companyName: ''
+        password: ''
     });
     const [generatedCredentials, setGeneratedCredentials] = useState(null);
     const [error, setError] = useState(null);
@@ -59,18 +58,17 @@ const AdminDashboard = () => {
         setError(null);
         try {
             const response = await axios.post(
-                'http://localhost:8081/api/auth/register',
+                'http://localhost:8081/api/users/register',
                 {
                     username: newSeller.username,
                     password: newSeller.password,
-                    role: 'SELLER',
-                    companyName: newSeller.companyName
+                    role: 'SELLER'
                 }
             );
             
             if (response.data) {
                 setSellers([...sellers, response.data]);
-                setNewSeller({ username: '', password: '', companyName: '' });
+                setNewSeller({ username: '', password: '' });
                 setGeneratedCredentials(null);
                 alert('Seller account created successfully!');
             }
@@ -198,13 +196,6 @@ const AdminDashboard = () => {
                 <section className="admin-section">
                     <h2>Create Seller Account</h2>
                     <form className="create-seller-form" onSubmit={handleCreateSeller}>
-                        <input
-                            type="text"
-                            placeholder="Company Name"
-                            value={newSeller.companyName}
-                            onChange={(e) => setNewSeller({...newSeller, companyName: e.target.value})}
-                            required
-                        />
                         <div className="credentials-section">
                             <button 
                                 type="button" 
