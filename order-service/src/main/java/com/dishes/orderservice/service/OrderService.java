@@ -4,6 +4,7 @@ import com.dishes.orderservice.model.Order;
 import com.dishes.orderservice.model.OrderItem;
 import com.dishes.orderservice.repository.OrderRepository;
 import com.dishes.orderservice.dto.DishDTO;
+import com.dishes.orderservice.dto.UserDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import java.util.Map;
 public class OrderService {
     private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
     private static final String DISH_SERVICE_URL = "http://localhost:8082/api/dishes";
+    private static final String USER_SERVICE_BASE_URL = "http://localhost:8081/api/users";
 
     @Autowired
     private OrderRepository orderRepository;
@@ -42,12 +44,22 @@ public class OrderService {
             throw new RuntimeException("Order must contain at least one item");
         }
 
+        // Get user information for customer name
+        UserDTO user = fetchUserInfo(userId);
+
         Order order = new Order();
         order.setCustomerId(userId);
+        
+        // Set the customer name if available
+        if (user != null) {
+            order.setCustomerName(user.getUsername());
+        }
+        
         order.setStatus(Order.OrderStatus.PENDING);
         
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
+        Long dishSellerId = null;
 
         for (Map<String, Object> item : items) {
             try {
@@ -79,6 +91,18 @@ public class OrderService {
                         logger.error("Dish is not available: {}", dish.getName());
                         throw new RuntimeException("Dish is not available: " + dish.getName());
                     }
+                    
+                    // If this is the first dish, store the seller ID
+                    // Assuming all dishes in the order are from the same seller
+                    if (dishSellerId == null && dish.getSellerId() != null) {
+                        dishSellerId = dish.getSellerId();
+                        order.setSellerId(dishSellerId);
+                        logger.info("Set seller ID to: {}", dishSellerId);
+                    } else if (dish.getSellerId() != null && !dish.getSellerId().equals(dishSellerId)) {
+                        // If we found a dish with a different seller ID, log a warning
+                        logger.warn("Dish {} has different seller ID {} than previous dishes {}",
+                            dishId, dish.getSellerId(), dishSellerId);
+                    }
 
                     OrderItem orderItem = new OrderItem();
                     orderItem.setDishId(dishId);
@@ -106,7 +130,8 @@ public class OrderService {
 
         order.setItems(orderItems);
         order.setTotalAmount(totalAmount);
-        logger.info("Saving order with total amount: {}", totalAmount);
+        logger.info("Saving order with total amount: {}, sellerId: {}, customerName: {}", 
+            totalAmount, order.getSellerId(), order.getCustomerName());
         return orderRepository.save(order);
     }
 
@@ -173,6 +198,82 @@ public class OrderService {
 
     @Transactional
     public Order createOrder(Order order) {
+        logger.info("Creating order directly with provided data: {}", order);
+        
+        if (order.getCustomerId() == null) {
+            logger.error("Customer ID cannot be null");
+            throw new RuntimeException("Customer ID cannot be null");
+        }
+        
+        // If customer name is missing, try to fetch it
+        if (order.getCustomerName() == null || order.getCustomerName().trim().isEmpty()) {
+            logger.info("Customer name not provided, attempting to fetch from user service");
+            UserDTO user = fetchUserInfo(order.getCustomerId());
+            if (user != null && user.getUsername() != null) {
+                order.setCustomerName(user.getUsername());
+                logger.info("Set customer name to: {}", user.getUsername());
+            }
+        }
+        
+        // Ensure there is a status set
+        if (order.getStatus() == null) {
+            order.setStatus(Order.OrderStatus.PENDING);
+        }
+        
+        // Make sure all order items have the correct order reference
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                item.setOrder(order);
+            }
+        }
+        
+        logger.info("Saving order with customer ID: {}, seller ID: {}, customer name: {}", 
+            order.getCustomerId(), order.getSellerId(), order.getCustomerName());
         return orderRepository.save(order);
+    }
+
+    /**
+     * Helper method to fetch user information
+     * @param userId ID of the user to fetch
+     * @return UserDTO if found, null otherwise
+     */
+    private UserDTO fetchUserInfo(Long userId) {
+        if (userId == null) {
+            logger.warn("Cannot fetch user info for null user ID");
+            return null;
+        }
+        
+        try {
+            // Try direct endpoint first
+            String directUrl = USER_SERVICE_BASE_URL + "/" + userId;
+            logger.info("Attempting to fetch user info from: {}", directUrl);
+            
+            try {
+                UserDTO user = restTemplate.getForObject(directUrl, UserDTO.class);
+                if (user != null && user.getId() != null) {
+                    logger.info("Successfully fetched user: {}", user.getUsername());
+                    return user;
+                }
+            } catch (Exception e) {
+                logger.warn("Error fetching user from direct endpoint: {}", e.getMessage());
+            }
+            
+            // If direct endpoint fails, try a different format
+            String alternateUrl = USER_SERVICE_BASE_URL + "/id/" + userId;
+            logger.info("Attempting to fetch user info from alternate endpoint: {}", alternateUrl);
+            
+            UserDTO user = restTemplate.getForObject(alternateUrl, UserDTO.class);
+            if (user != null && user.getId() != null) {
+                logger.info("Successfully fetched user from alternate endpoint: {}", user.getUsername());
+                return user;
+            }
+            
+            logger.warn("Could not find user with ID: {}", userId);
+            return null;
+            
+        } catch (Exception e) {
+            logger.error("Failed to fetch user info for user ID {}: {}", userId, e.getMessage());
+            return null;
+        }
     }
 } 

@@ -571,7 +571,7 @@ const SellerDashboard = () => {
                             {orders.map(order => (
                                 <div key={order.id} className="order-card">
                                     <h3>Order #{order.id}</h3>
-                                    <p>Customer: {order.customerName}</p>
+                                    <p>Customer: {order.customerName || `# ${order.customerId}`}</p>
                                     <p>Date: {new Date(order.createdAt).toLocaleString()}</p>
                                     <p>Status: {order.status}</p>
                                     <div className="order-items">
