@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import SalesHistory from '../components/SalesHistory';
 import './SellerDashboard.css';
 
 const SellerDashboard = () => {
@@ -420,25 +421,38 @@ const SellerDashboard = () => {
             
             <div className="dashboard-tabs">
                 <button 
-                    className={`tab ${activeTab === 'dishes' ? 'active' : ''}`}
+                    className={activeTab === 'dishes' ? 'active' : ''} 
                     onClick={() => setActiveTab('dishes')}
                 >
                     Manage Dishes
                 </button>
                 <button 
-                    className={`tab ${activeTab === 'orders' ? 'active' : ''}`}
+                    className={activeTab === 'orders' ? 'active' : ''} 
                     onClick={() => setActiveTab('orders')}
                 >
-                    Current Orders
+                    Incoming Orders
                 </button>
                 <button 
-                    className={`tab ${activeTab === 'sold' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('sold')}
+                    className={activeTab === 'sales' ? 'active' : ''} 
+                    onClick={() => setActiveTab('sales')}
                 >
                     Sales History
                 </button>
+                <button 
+                    className={activeTab === 'sold-dishes' ? 'active' : ''} 
+                    onClick={() => setActiveTab('sold-dishes')}
+                >
+                    Delivered Orders
+                </button>
             </div>
             
+            {/* Sales History Tab */}
+            {activeTab === 'sales' && (
+                <div className="sales-tab">
+                    <SalesHistory />
+                </div>
+            )}
+
             {activeTab === 'dishes' && (
                 <>
                     <section className="create-dish">
@@ -618,7 +632,7 @@ const SellerDashboard = () => {
                 </section>
             )}
 
-            {activeTab === 'sold' && (
+            {activeTab === 'sold-dishes' && (
                 <section className="sold-dishes-section">
                     <h2>Sales History</h2>
                     {loading.soldDishes ? (

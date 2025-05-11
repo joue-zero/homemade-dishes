@@ -29,6 +29,9 @@ public class OrderService {
     @Autowired
     private RestTemplate restTemplate;
 
+    @Autowired
+    private OrderValidationService orderValidationService;
+
     @Transactional
     public Order createOrder(Long userId, List<Map<String, Object>> items) {
         logger.info("Creating order for user: {}", userId);
@@ -132,7 +135,17 @@ public class OrderService {
         order.setTotalAmount(totalAmount);
         logger.info("Saving order with total amount: {}, sellerId: {}, customerName: {}", 
             totalAmount, order.getSellerId(), order.getCustomerName());
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+        
+        // Trigger order validation after saving
+        try {
+            orderValidationService.startOrderValidation(savedOrder);
+        } catch (Exception e) {
+            logger.error("Error initiating order validation: {}", e.getMessage(), e);
+            // Don't disrupt existing flow by throwing exceptions, just log it
+        }
+        
+        return savedOrder;
     }
 
     public List<Order> getUserOrders(Long userId) {

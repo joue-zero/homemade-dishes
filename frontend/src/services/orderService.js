@@ -63,5 +63,14 @@ export const orderService = {
         } catch (error) {
             throw error.response?.data || error.message;
         }
+    },
+
+    getOrdersBySeller: async (sellerId) => {
+        try {
+            const response = await axios.get(`${API_URL}/seller/${sellerId}`, getAuthHeader());
+            return response.data;
+        } catch (error) {
+            throw error.response?.data || error.message;
+        }
     }
 }; 
