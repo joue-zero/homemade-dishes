@@ -121,9 +121,36 @@ public class OrderService {
 
     @Transactional
     public Order updateOrderStatus(Long orderId, Order.OrderStatus status) {
-        Order order = getOrder(orderId);
-        order.setStatus(status);
-        return orderRepository.save(order);
+        logger.info("Service: Updating order status for orderId={} to {}", orderId, status);
+        
+        if (orderId == null) {
+            logger.error("Order ID cannot be null");
+            throw new RuntimeException("Order ID cannot be null");
+        }
+        
+        if (status == null) {
+            logger.error("Order status cannot be null");
+            throw new RuntimeException("Order status cannot be null");
+        }
+        
+        try {
+            Order order = orderRepository.findById(orderId)
+                    .orElseThrow(() -> {
+                        logger.error("Order not found with id: {}", orderId);
+                        return new RuntimeException("Order not found with id: " + orderId);
+                    });
+            
+            // Log the current and new status
+            logger.info("Changing order status from {} to {}", order.getStatus(), status);
+            order.setStatus(status);
+            
+            Order savedOrder = orderRepository.save(order);
+            logger.info("Order status updated successfully: {}", savedOrder);
+            return savedOrder;
+        } catch (Exception e) {
+            logger.error("Error updating order status: {}", e.getMessage(), e);
+            throw new RuntimeException("Error updating order status: " + e.getMessage(), e);
+        }
     }
 
     @Transactional

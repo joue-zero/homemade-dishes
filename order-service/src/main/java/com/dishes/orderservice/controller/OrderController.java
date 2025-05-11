@@ -1,6 +1,7 @@
 package com.dishes.orderservice.controller;
 
 import com.dishes.orderservice.dto.OrderDTO;
+import com.dishes.orderservice.dto.OrderStatusUpdateRequest;
 import com.dishes.orderservice.mapper.OrderMapper;
 import com.dishes.orderservice.model.Order;
 import com.dishes.orderservice.service.OrderService;
@@ -59,55 +60,89 @@ public class OrderController {
 
     @GetMapping
     public ResponseEntity<List<OrderDTO>> getUserOrders(@RequestHeader("X-User-Id") Long userId) {
+        logger.info("Fetching orders for user ID: {}", userId);
         List<Order> orders = orderService.getUserOrders(userId);
         List<OrderDTO> orderDTOs = orders.stream()
                 .map(orderMapper::toDTO)
                 .collect(Collectors.toList());
+        logger.info("Found {} orders for user ID: {}", orders.size(), userId);
         return ResponseEntity.ok(orderDTOs);
     }
 
     @GetMapping("/{orderId}")
     public ResponseEntity<Order> getOrder(@PathVariable Long orderId) {
-        return ResponseEntity.ok(orderService.getOrder(orderId));
+        logger.info("Fetching order with ID: {}", orderId);
+        Order order = orderService.getOrder(orderId);
+        logger.info("Found order: {}", order);
+        return ResponseEntity.ok(order);
     }
 
     @PutMapping("/{orderId}/status")
-    public ResponseEntity<Order> updateOrderStatus(
+    public ResponseEntity<?> updateOrderStatus(
             @PathVariable Long orderId,
             @RequestBody OrderStatusUpdateRequest request) {
-        return ResponseEntity.ok(orderService.updateOrderStatus(orderId, request.getStatus()));
+        logger.info("Updating status of order {} to {}", orderId, request.getStatus());
+        try {
+            if (orderId == null) {
+                logger.error("Order ID cannot be null");
+                return ResponseEntity.badRequest().body("Order ID cannot be null");
+            }
+            
+            if (request == null || request.getStatus() == null) {
+                logger.error("Order status cannot be null");
+                return ResponseEntity.badRequest().body("Order status cannot be null");
+            }
+            
+            Order updatedOrder = orderService.updateOrderStatus(orderId, request.getStatus());
+            logger.info("Order status updated successfully: {}", updatedOrder);
+            return ResponseEntity.ok(updatedOrder);
+        } catch (Exception e) {
+            logger.error("Error updating order status: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error updating order status: " + e.getMessage());
+        }
     }
 
     @PostMapping("/{id}/cancel")
     public String cancelOrder(@PathVariable Long id) {
+        logger.info("Cancelling order with ID: {}", id);
         orderService.cancelOrder(id);
+        logger.info("Order cancelled successfully");
         return "Order cancelled successfully";
     }
 
     @GetMapping("/seller/{sellerId}")
     public ResponseEntity<List<Order>> getOrdersBySeller(@PathVariable Long sellerId) {
-        return ResponseEntity.ok(orderService.getOrdersBySeller(sellerId));
+        logger.info("Fetching orders for seller ID: {}", sellerId);
+        List<Order> orders = orderService.getOrdersBySeller(sellerId);
+        logger.info("Found {} orders for seller ID: {}", orders.size(), sellerId);
+        
+        // Log order details for debugging
+        if (orders.isEmpty()) {
+            logger.warn("No orders found for seller ID: {}", sellerId);
+        } else {
+            for (Order order : orders) {
+                logger.debug("Order: id={}, status={}, customerId={}, items={}", 
+                    order.getId(), order.getStatus(), order.getCustomerId(), order.getItems().size());
+            }
+        }
+        
+        return ResponseEntity.ok(orders);
     }
 
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<List<Order>> getOrdersByCustomer(@PathVariable Long customerId) {
-        return ResponseEntity.ok(orderService.getOrdersByCustomer(customerId));
+        logger.info("Fetching orders for customer ID: {}", customerId);
+        List<Order> orders = orderService.getOrdersByCustomer(customerId);
+        logger.info("Found {} orders for customer ID: {}", orders.size(), customerId);
+        return ResponseEntity.ok(orders);
     }
 
     @PostMapping
     public ResponseEntity<Order> createOrder(@RequestBody Order order) {
-        return ResponseEntity.ok(orderService.createOrder(order));
-    }
-}
-
-class OrderStatusUpdateRequest {
-    private Order.OrderStatus status;
-
-    public Order.OrderStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(Order.OrderStatus status) {
-        this.status = status;
+        logger.info("Creating order directly: {}", order);
+        Order createdOrder = orderService.createOrder(order);
+        logger.info("Order created successfully: {}", createdOrder);
+        return ResponseEntity.ok(createdOrder);
     }
 } 

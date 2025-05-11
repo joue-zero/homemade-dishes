@@ -358,11 +358,13 @@ const SellerDashboard = () => {
     const handleUpdateOrderStatus = async (orderId, newStatus) => {
         try {
             const userId = localStorage.getItem('userId');
+            console.log(`Attempting to update order ${orderId} to status ${newStatus}`);
+            
             // Try direct service first
             try {
-                await axios.put(
+                const response = await axios.put(
                     `http://localhost:8083/api/orders/${orderId}/status`, 
-                    { status: newStatus }, 
+                    { status: String(newStatus) }, // Ensure it's a string
                     { 
                         headers: { 
                             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -371,11 +373,17 @@ const SellerDashboard = () => {
                         timeout: 5000
                     }
                 );
+                console.log('Status update response:', response.data);
             } catch (primaryError) {
+                console.error('Error with primary endpoint:', primaryError.response?.data || primaryError.message);
+                
+                // Log the request payload for debugging
+                console.log('Request payload for fallback:', { status: String(newStatus) });
+                
                 // Fallback to gateway
-                await axios.put(
-                    `http://localhost:8081/api/orders/${orderId}/status`, 
-                    { status: newStatus }, 
+                const response = await axios.put(
+                    `http://localhost:8083/api/orders/${orderId}/status`, 
+                    { status: String(newStatus) }, // Ensure it's a string
                     { 
                         headers: { 
                             'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -384,6 +392,7 @@ const SellerDashboard = () => {
                         timeout: 5000
                     }
                 );
+                console.log('Fallback status update response:', response.data);
             }
             
             // Update local state
@@ -398,8 +407,8 @@ const SellerDashboard = () => {
             
             setError(null);
         } catch (error) {
-            console.error('Error updating order status:', error);
-            setError('Failed to update order status. Please try again.');
+            console.error('Error updating order status:', error.response?.data || error.message);
+            setError(`Failed to update order status: ${error.response?.data || error.message}`);
         }
     };
 
