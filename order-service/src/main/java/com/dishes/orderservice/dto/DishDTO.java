@@ -12,6 +12,7 @@ public class DishDTO {
     private String category;
     private String imageUrl;
     private boolean available;
+    private Integer quantity;
     
     // Getters and Setters
     public Long getId() {
@@ -68,5 +69,13 @@ public class DishDTO {
 
     public void setAvailable(boolean available) {
         this.available = available;
+    }
+    
+    public Integer getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
     }
 } 

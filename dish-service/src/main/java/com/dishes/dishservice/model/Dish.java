@@ -29,6 +29,9 @@ public class Dish {
     @Column(nullable = false)
     private Boolean available = true;
 
+    @Column(name = "quantity")
+    private Integer quantity;
+
     @Column(name = "seller_id")
     private Long sellerId;
 

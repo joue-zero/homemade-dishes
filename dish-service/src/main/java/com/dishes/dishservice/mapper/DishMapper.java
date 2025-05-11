@@ -20,6 +20,7 @@ public class DishMapper {
         dto.setCategory(dish.getCategory());
         dto.setImageUrl(dish.getImageUrl());
         dto.setAvailable(dish.getAvailable());
+        dto.setQuantity(dish.getQuantity());
         dto.setSellerId(dish.getSellerId());
 
         return dto;
@@ -38,6 +39,7 @@ public class DishMapper {
         dish.setCategory(dto.getCategory());
         dish.setImageUrl(dto.getImageUrl());
         dish.setAvailable(dto.getAvailable());
+        dish.setQuantity(dto.getQuantity());
         dish.setSellerId(dto.getSellerId());
 
         return dish;

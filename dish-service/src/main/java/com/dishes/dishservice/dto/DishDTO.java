@@ -11,5 +11,6 @@ public class DishDTO {
     private String category;
     private String imageUrl;
     private Boolean available;
+    private Integer quantity;
     private Long sellerId;
 } 

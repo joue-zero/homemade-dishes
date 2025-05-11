@@ -33,7 +33,7 @@ const SellerDashboard = () => {
         'Swift Transport Solutions'
     ];
 
-    // Sample data for fallbacks
+    // Sample data for fallbacks (kept for graceful fallback)
     const sampleOrders = [
         {
             id: 1,
@@ -95,30 +95,36 @@ const SellerDashboard = () => {
     const fetchOrders = async () => {
         setLoading(prev => ({ ...prev, orders: true }));
         try {
-            // Try the order service first
+            // Try the order service directly (port 8083)
             const userId = localStorage.getItem('userId');
-            const response = await axios.get(`http://localhost:8081/api/orders/seller/${userId}`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                timeout: 3000 // Add timeout to prevent long waiting
-            });
-            setOrders(response.data);
-            setError(null);
-        } catch (error) {
             try {
-                // Try alternate port if first one fails
-                const userId = localStorage.getItem('userId');
                 const response = await axios.get(`http://localhost:8083/api/orders/seller/${userId}`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                    timeout: 3000
+                    headers: { 
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'X-User-Id': userId
+                    },
+                    timeout: 5000
                 });
                 setOrders(response.data);
                 setError(null);
-            } catch (fallbackError) {
-                console.error('Error fetching orders:', fallbackError);
-                setError('Failed to load orders. Using sample data for now.');
-                // Use sample data when both endpoints fail
-                setOrders(sampleOrders);
+            } catch (primaryError) {
+                console.error('Error fetching orders from primary endpoint:', primaryError);
+                
+                // Try through gateway (port 8081) if direct call fails
+                const response = await axios.get(`http://localhost:8081/api/orders/seller/${userId}`, {
+                    headers: { 
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'X-User-Id': userId
+                    },
+                    timeout: 5000
+                });
+                setOrders(response.data);
+                setError(null);
             }
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+            setError('Failed to load orders. Using sample data for now.');
+            setOrders(sampleOrders);
         } finally {
             setLoading(prev => ({ ...prev, orders: false }));
         }
@@ -127,44 +133,59 @@ const SellerDashboard = () => {
     const fetchSoldDishes = async () => {
         setLoading(prev => ({ ...prev, soldDishes: true }));
         try {
-            // Try the order service first
             const userId = localStorage.getItem('userId');
-            const response = await axios.get(`http://localhost:8081/api/orders/seller/${userId}/history`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                timeout: 3000
+            
+            // Get completed orders from the API
+            let completedOrders = [];
+            try {
+                const response = await axios.get(`http://localhost:8083/api/orders/seller/${userId}`, {
+                    headers: { 
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'X-User-Id': userId
+                    },
+                    timeout: 5000
+                });
+                // Filter for completed orders
+                completedOrders = response.data.filter(order => order.status === 'COMPLETED');
+            } catch (primaryError) {
+                console.error('Error fetching completed orders from primary endpoint:', primaryError);
+                
+                // Try gateway if direct call fails
+                const response = await axios.get(`http://localhost:8081/api/orders/seller/${userId}`, {
+                    headers: { 
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'X-User-Id': userId
+                    },
+                    timeout: 5000
+                });
+                // Filter for completed orders
+                completedOrders = response.data.filter(order => order.status === 'COMPLETED');
+            }
+            
+            // Transform orders into sold dishes format
+            const soldDishesData = completedOrders.flatMap(order => {
+                return order.items.map(item => ({
+                    dishId: item.dishId,
+                    orderId: order.id,
+                    dishName: item.dishName,
+                    orderDate: order.createdAt,
+                    quantity: item.quantity,
+                    price: item.price,
+                    customerName: order.customerName || 'Customer',
+                    customerEmail: order.customerEmail || 'customer@example.com',
+                    customerPhone: order.customerPhone || '123-456-7890',
+                    shippingCompany: shippingCompanies[Math.floor(Math.random() * shippingCompanies.length)],
+                    deliveryStatus: 'Delivered',
+                    shippingAddress: order.shippingAddress || '123 Main St, Anytown, USA'
+                }));
             });
             
-            // Process the data to add shipping company
-            const processedData = response.data.map(item => ({
-                ...item,
-                shippingCompany: shippingCompanies[Math.floor(Math.random() * shippingCompanies.length)]
-            }));
-            
-            setSoldDishes(processedData);
+            setSoldDishes(soldDishesData);
             setError(null);
         } catch (error) {
-            try {
-                // Try alternate port if first one fails
-                const userId = localStorage.getItem('userId');
-                const response = await axios.get(`http://localhost:8083/api/orders/seller/${userId}/history`, {
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                    timeout: 3000
-                });
-                
-                // Process the data to add shipping company
-                const processedData = response.data.map(item => ({
-                    ...item,
-                    shippingCompany: shippingCompanies[Math.floor(Math.random() * shippingCompanies.length)]
-                }));
-                
-                setSoldDishes(processedData);
-                setError(null);
-            } catch (fallbackError) {
-                console.error('Error fetching sold dishes:', fallbackError);
-                setError('Failed to load sales history. Using sample data for now.');
-                // Use sample data when both endpoints fail
-                setSoldDishes(sampleSoldDishes);
-            }
+            console.error('Error processing sold dishes:', error);
+            setError('Failed to load sales history. Using sample data for now.');
+            setSoldDishes(sampleSoldDishes);
         } finally {
             setLoading(prev => ({ ...prev, soldDishes: false }));
         }
@@ -208,6 +229,8 @@ const SellerDashboard = () => {
         e.preventDefault();
         try {
             const userId = localStorage.getItem('userId');
+            console.log(editingDish);
+            
             const response = await axios.put(
                 `http://localhost:8082/api/sellers/${userId}/dishes/${editingDish.id}`,
                 editingDish,
@@ -248,28 +271,44 @@ const SellerDashboard = () => {
 
     const handleUpdateOrderStatus = async (orderId, newStatus) => {
         try {
-            // Try the order service first
+            const userId = localStorage.getItem('userId');
+            // Try direct service first
             try {
-                await axios.put(`http://localhost:8081/api/orders/${orderId}/status`, 
-                { status: newStatus }, 
-                { 
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                    timeout: 3000
-                });
+                await axios.put(
+                    `http://localhost:8083/api/orders/${orderId}/status`, 
+                    { status: newStatus }, 
+                    { 
+                        headers: { 
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                            'X-User-Id': userId
+                        },
+                        timeout: 5000
+                    }
+                );
             } catch (primaryError) {
-                // Fallback to alternate port
-                await axios.put(`http://localhost:8083/api/orders/${orderId}/status`, 
-                { status: newStatus }, 
-                { 
-                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                    timeout: 3000
-                });
+                // Fallback to gateway
+                await axios.put(
+                    `http://localhost:8081/api/orders/${orderId}/status`, 
+                    { status: newStatus }, 
+                    { 
+                        headers: { 
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                            'X-User-Id': userId
+                        },
+                        timeout: 5000
+                    }
+                );
             }
             
             // Update local state
             setOrders(orders.map(order => 
                 order.id === orderId ? { ...order, status: newStatus } : order
             ));
+            
+            // If the status is COMPLETED, refresh the sales history
+            if (newStatus === 'COMPLETED') {
+                fetchSoldDishes();
+            }
             
             setError(null);
         } catch (error) {
