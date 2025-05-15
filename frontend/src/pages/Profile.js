@@ -5,6 +5,7 @@ import './Profile.css';
 const Profile = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [balance, setBalance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -17,6 +18,7 @@ const Profile = () => {
 
   useEffect(() => {
     fetchUserProfile();
+    fetchUserBalance();
   }, []);
 
   const fetchUserProfile = async () => {
@@ -44,6 +46,23 @@ const Profile = () => {
       setError('An error occurred while fetching profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserBalance = async () => {
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8081/api/users/${userId}/balance`);
+      if (response.ok) {
+        const balanceData = await response.json();
+        setBalance(Number(balanceData));
+      }
+    } catch (err) {
+      console.error('Error fetching user balance:', err);
     }
   };
 
@@ -168,6 +187,10 @@ const Profile = () => {
             <div className="info-group">
               <label>Role</label>
               <p>{user.role}</p>
+            </div>
+            <div className="info-group">
+              <label>Balance</label>
+              <p>${balance ? balance.toFixed(2) : "Loading..."}</p>
             </div>
             <div className="info-group">
               <label>Member Since</label>

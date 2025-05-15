@@ -31,10 +31,10 @@ Write-Host "Starting rebuild and run process..." -ForegroundColor Yellow
 # Build and run services in order
 BuildAndRunService -serviceName "user-service" -port "8081"
 BuildAndRunService -serviceName "dish-service" -port "8082"
-BuildAndRunService -serviceName "order-service" -port "8083"
+BuildAndRunService -serviceName "order-service" -port "8084"
 
 Write-Host "`nAll services have been rebuilt and started!" -ForegroundColor Green
 Write-Host "Services are running on:"
 Write-Host "- User Service: http://localhost:8081"
 Write-Host "- Dish Service: http://localhost:8082"
-Write-Host "- Order Service: http://localhost:8083" 
+Write-Host "- Order Service: http://localhost:8084" 

@@ -25,6 +25,7 @@
 .navbar-links {
   display: flex;
   gap: 2rem;
+  align-items: center;
 }
 
 .nav-link {
@@ -36,6 +37,16 @@
 
 .nav-link:hover {
   color: #3498db;
+}
+
+.nav-balance {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  color: #2c3e50;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .navbar-auth {

@@ -1,7 +1,9 @@
 import axios from 'axios';
 import { DEFAULT_USER_BALANCE } from '../constants/AppConstants';
 
-const API_URL = 'http://localhost:8083/api/balance';
+// Update to use the user service API directly
+const API_URL = 'http://localhost:8081/api/users';
+const BALANCE_API_URL = 'http://localhost:8084/api/balance';
 
 const getAuthHeader = () => {
     const token = localStorage.getItem('token');
@@ -19,10 +21,8 @@ const getAuthHeader = () => {
 
 /**
  * Balance Service
- * Simple simulation using localStorage to manage user balance
+ * Handles user balance operations by communicating with APIs
  */
-const BALANCE_KEY = 'user_balance';
-
 export const balanceService = {
     /**
      * Initialize user balance if not exists
@@ -43,8 +43,14 @@ export const balanceService = {
      */
     getBalance: async () => {
         try {
-            const response = await axios.get(API_URL, getAuthHeader());
-            return response.data.balance;
+            const userId = localStorage.getItem('userId');
+            if (!userId) {
+                throw new Error('User ID not found');
+            }
+            
+            // Use either the order service balance API or the user service directly
+            const response = await axios.get(`${API_URL}/${userId}/balance`);
+            return response.data;
         } catch (error) {
             console.error('Error getting balance:', error);
             throw error.response?.data || error.message;
@@ -56,8 +62,14 @@ export const balanceService = {
      */
     updateBalance: async (amount) => {
         try {
+            const userId = localStorage.getItem('userId');
+            if (!userId) {
+                throw new Error('User ID not found');
+            }
+            
+            // Use the order service balance API which will forward to user service
             const response = await axios.post(
-                `${API_URL}/update?amount=${amount}`, 
+                `${BALANCE_API_URL}/update?amount=${amount}`, 
                 null, 
                 getAuthHeader()
             );
@@ -73,8 +85,9 @@ export const balanceService = {
      */
     hasSufficientBalance: async (amount) => {
         try {
+            // Use the order service's balance check API
             const response = await axios.get(
-                `${API_URL}/check?amount=${amount}`, 
+                `${BALANCE_API_URL}/check?amount=${amount}`, 
                 getAuthHeader()
             );
             return response.data;

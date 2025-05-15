@@ -9,15 +9,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class PaymentService {
     private static final Logger logger = LoggerFactory.getLogger(PaymentService.class);
+    private static final String USER_SERVICE_URL = "http://localhost:8081/api/users";
     
     @Autowired
     private OrderService orderService;
+    
+    @Autowired
+    private RestTemplate restTemplate;
     
     @Value("${order.minimum.charge:10.0}")
     private BigDecimal minimumOrderCharge;
@@ -72,26 +79,40 @@ public class PaymentService {
             );
         }
         
-        // Process payment (simulated)
+        // Check user balance in user service
         try {
-            // In a real app, this would call a payment gateway
-            boolean paymentSucceeded = processPaymentWithGateway(request);
+            Long customerId = order.getCustomerId();
+            BigDecimal orderAmount = order.getTotalAmount();
             
-            if (paymentSucceeded) {
-                // Update order payment status
-                order.setPaymentStatus(Order.PaymentStatus.PAID);
-                orderService.createOrder(order);
+            // Get current balance
+            String balanceUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
+            BigDecimal currentBalance = restTemplate.getForObject(balanceUrl, BigDecimal.class);
+            
+            // Check if balance is sufficient
+            if (currentBalance == null || currentBalance.compareTo(orderAmount) < 0) {
+                logger.error("Insufficient balance: {} for order amount: {}", 
+                    currentBalance, orderAmount);
                 
-                logger.info("Payment succeeded for order: {}", request.getOrderId());
-                return PaymentResponse.success(request.getOrderId());
-            } else {
-                // Update order payment status
-                order.setPaymentStatus(Order.PaymentStatus.FAILED);
-                orderService.createOrder(order);
-                
-                logger.error("Payment failed for order: {}", request.getOrderId());
-                return PaymentResponse.failed(request.getOrderId(), "Payment processing failed");
+                return PaymentResponse.failed(
+                    request.getOrderId(),
+                    "Insufficient balance to process payment"
+                );
             }
+            
+            // Update balance by deducting order amount
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("amount", orderAmount);
+            
+            // Call user service to update balance
+            restTemplate.postForObject(balanceUrl, payload, BigDecimal.class);
+            logger.info("Updated user balance for customer ID: {}, deducted amount: {}", customerId, orderAmount);
+            
+            // Update order payment status to paid
+            order.setPaymentStatus(Order.PaymentStatus.PAID);
+            orderService.createOrder(order);
+            
+            logger.info("Payment succeeded for order: {}", request.getOrderId());
+            return PaymentResponse.success(request.getOrderId());
         } catch (Exception e) {
             logger.error("Error processing payment: {}", e.getMessage(), e);
             return PaymentResponse.failed(request.getOrderId(), "Payment processing error: " + e.getMessage());
@@ -111,28 +132,5 @@ public class PaymentService {
             throw new RuntimeException("Order not found: " + orderId);
         }
         return order.getPaymentStatus();
-    }
-    
-    /**
-     * Process payment with external payment gateway (simulated)
-     * @param request Payment details
-     * @return true if payment succeeded, false otherwise
-     */
-    private boolean processPaymentWithGateway(PaymentRequest request) {
-        // Simulate payment processing
-        // In a real app, this would call an external payment service
-        
-        // For testing purposes, consider all payments valid except those with specific test card numbers
-        if (request.getCardNumber() != null && 
-            (request.getCardNumber().equals("4111111111111111") || 
-             request.getCardNumber().startsWith("4242"))) {
-            return true;
-        } else if (request.getCardNumber() != null && 
-                  request.getCardNumber().equals("4000000000000002")) {
-            return false; // simulate declined payment
-        }
-        
-        // Default to successful for testing
-        return true;
     }
 } 

@@ -3,6 +3,7 @@ import axios from 'axios';
 
 function OrderList() {
   const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchOrders();
@@ -10,11 +11,16 @@ function OrderList() {
 
   const fetchOrders = async () => {
     try {
+      setLoading(true);
       const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.get(`http://localhost:8083/api/orders/customer/${user.id}`);
+      const token = localStorage.getItem('token');
+      
+      const response = await axios.get(`http://localhost:8084/api/orders/customer/${user.id}`);
       setOrders(response.data);
     } catch (error) {
       console.error('Error fetching orders:', error);
+    } finally {
+      setLoading(false);
     }
   };
 

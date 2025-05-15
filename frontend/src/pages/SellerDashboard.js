@@ -107,32 +107,22 @@ const SellerDashboard = () => {
     const fetchOrders = async () => {
         setLoading(prev => ({ ...prev, orders: true }));
         try {
-            // Try the order service directly (port 8083)
             const userId = localStorage.getItem('userId');
-            try {
-                const response = await axios.get(`http://localhost:8083/api/orders/seller/${userId}`, {
-                    headers: { 
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                        'X-User-Id': userId
-                    },
-                    timeout: 5000
-                });
-                setOrders(response.data);
-                setError(null);
-            } catch (primaryError) {
-                console.error('Error fetching orders from primary endpoint:', primaryError);
-                
-                // Try through gateway (port 8081) if direct call fails
-                const response = await axios.get(`http://localhost:8081/api/orders/seller/${userId}`, {
-                    headers: { 
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                        'X-User-Id': userId
-                    },
-                    timeout: 5000
-                });
-                setOrders(response.data);
-                setError(null);
+            if (!userId) {
+                setError('User ID not found. Please login again.');
+                return;
             }
+            
+            const response = await axios.get(`http://localhost:8084/api/orders/seller/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'X-User-Id': userId
+                }
+            });
+            
+            const fetchedOrders = response.data;
+            setOrders(fetchedOrders);
+            setError(null);
         } catch (error) {
             console.error('Error fetching orders:', error);
             setError('Failed to load orders. Using sample data for now.');
@@ -150,7 +140,7 @@ const SellerDashboard = () => {
             // Get completed orders from the API
             let completedOrders = [];
             try {
-                const response = await axios.get(`http://localhost:8083/api/orders/seller/${userId}`, {
+                const response = await axios.get(`http://localhost:8084/api/orders/seller/${userId}`, {
                     headers: { 
                         'Authorization': `Bearer ${localStorage.getItem('token')}`,
                         'X-User-Id': userId
@@ -364,7 +354,7 @@ const SellerDashboard = () => {
             // Try direct service first
             try {
                 const response = await axios.put(
-                    `http://localhost:8083/api/orders/${orderId}/status`, 
+                    `http://localhost:8084/api/orders/${orderId}/status`, 
                     { status: String(newStatus) }, // Ensure it's a string
                     { 
                         headers: { 
@@ -383,7 +373,7 @@ const SellerDashboard = () => {
                 
                 // Fallback to gateway
                 const response = await axios.put(
-                    `http://localhost:8083/api/orders/${orderId}/status`, 
+                    `http://localhost:8084/api/orders/${orderId}/status`, 
                     { status: String(newStatus) }, // Ensure it's a string
                     { 
                         headers: { 

@@ -65,6 +65,20 @@
     border-radius: 4px;
 }
 
+.payment-summary {
+    background-color: #e3f2fd;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 10px 0;
+    text-align: center;
+}
+
+.payment-summary p {
+    margin: 0;
+    font-size: 16px;
+    color: #0d47a1;
+}
+
 .payment-submit-btn {
     background-color: #4caf50;
     color: white;

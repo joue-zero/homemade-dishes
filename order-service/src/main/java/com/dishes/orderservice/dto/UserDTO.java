@@ -1,12 +1,14 @@
 package com.dishes.orderservice.dto;
 
 import lombok.Data;
+import java.math.BigDecimal;
 
 @Data
 public class UserDTO {
     private Long id;
     private String username;
     private String role;
+    private BigDecimal balance;
     
     // Getters and Setters
     public Long getId() {
@@ -31,5 +33,13 @@ public class UserDTO {
 
     public void setRole(String role) {
         this.role = role;
+    }
+    
+    public BigDecimal getBalance() {
+        return balance;
+    }
+    
+    public void setBalance(BigDecimal balance) {
+        this.balance = balance;
     }
 } 

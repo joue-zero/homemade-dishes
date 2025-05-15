@@ -15,11 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class OrderValidationService {
     private static final Logger logger = LoggerFactory.getLogger(OrderValidationService.class);
     private static final String DISH_SERVICE_URL = "http://localhost:8082/api/dishes";
+    private static final String USER_SERVICE_URL = "http://localhost:8081/api/users";
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -39,14 +42,61 @@ public class OrderValidationService {
      * @param order The order to validate
      */
     public void startOrderValidation(Order order) {
-        logger.info("Starting order validation for order ID: {}", order.getId());
-        OrderValidationMessage message = OrderValidationMessage.fromOrder(order);
+        try {
+            logger.info("Starting order validation for order ID: {}", order.getId());
+            OrderValidationMessage message = OrderValidationMessage.fromOrder(order);
+            
+            if (rabbitTemplate != null) {
+                rabbitTemplate.convertAndSend(
+                    OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
+                    OrderValidationConfig.STOCK_CHECK_ROUTING_KEY,
+                    message
+                );
+            } else {
+                logger.warn("RabbitTemplate is null, skipping message send. Processing order locally...");
+                // Process order directly without using message queue
+                validateAndCompleteOrder(order);
+            }
+        } catch (Exception e) {
+            logger.error("Error sending order validation message: {}", e.getMessage(), e);
+            // Process order directly in case of error
+            validateAndCompleteOrder(order);
+        }
+    }
+
+    /**
+     * Direct validation and completion of order without using message queue
+     */
+    private void validateAndCompleteOrder(Order order) {
+        logger.info("Processing order {} directly without message queue", order.getId());
         
-        rabbitTemplate.convertAndSend(
-            OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
-            OrderValidationConfig.STOCK_CHECK_ROUTING_KEY,
-            message
-        );
+        // Update the user's balance
+        try {
+            Long customerId = order.getCustomerId();
+            BigDecimal totalAmount = order.getTotalAmount();
+            
+            String balanceUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
+            
+            // Create payload for balance update
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("amount", totalAmount);
+            
+            // Call user service to update balance
+            restTemplate.postForObject(balanceUrl, payload, BigDecimal.class);
+            logger.info("Updated user balance for customer ID: {}, deducted amount: {}", customerId, totalAmount);
+            
+            // Mark order as completed
+            order.setStatus(Order.OrderStatus.COMPLETED);
+            order.setPaymentStatus(Order.PaymentStatus.PAID);
+            orderService.createOrder(order);
+            
+            logger.info("Order ID: {} completed successfully via direct processing", order.getId());
+        } catch (Exception e) {
+            logger.error("Error processing order directly: {}", e.getMessage(), e);
+            // Mark order as rejected if there's an error
+            order.setStatus(Order.OrderStatus.REJECTED);
+            orderService.createOrder(order);
+        }
     }
 
     /**
@@ -170,6 +220,24 @@ public class OrderValidationService {
         order.setStatus(Order.OrderStatus.COMPLETED);
         order.setPaymentStatus(Order.PaymentStatus.PAID);
         orderService.createOrder(order); // Save updated order
+        
+        // Update user balance
+        try {
+            Long customerId = order.getCustomerId();
+            BigDecimal totalAmount = order.getTotalAmount();
+            
+            String balanceUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
+            
+            // Create payload for balance update
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("amount", totalAmount);
+            
+            // Call user service to update balance
+            restTemplate.postForObject(balanceUrl, payload, BigDecimal.class);
+            logger.info("Updated user balance for customer ID: {}, deducted amount: {}", customerId, totalAmount);
+        } catch (Exception e) {
+            logger.error("Error updating user balance: {}", e.getMessage(), e);
+        }
         
         // Update inventory by reducing quantities
         for (OrderValidationMessage.OrderItemInfo item : message.getItems()) {
