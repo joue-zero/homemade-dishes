@@ -46,14 +46,25 @@ public class DishController {
     @PutMapping("/{id}")
     public ResponseEntity<DishDTO> updateDish(@PathVariable Long id, @RequestBody DishDTO dishDTO) {
         Dish dish = dishMapper.toEntity(dishDTO);
-        Dish updatedDish = dishService.updateDish(id, dish);
+        dish.setId(id); // Ensure ID is set correctly
+        Dish updatedDish = dishService.updateDish(dish);
         return ResponseEntity.ok(dishMapper.toDTO(updatedDish));
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteDish(@PathVariable Long id) {
-        dishService.deleteDish(id);
-        return ResponseEntity.ok().build();
+    @PatchMapping("/{id}/stock")
+    public ResponseEntity<DishDTO> updateStock(
+            @PathVariable Long id,
+            @RequestParam Integer quantity) {
+        Dish updatedDish = dishService.updateStock(id, quantity);
+        return ResponseEntity.ok(dishMapper.toDTO(updatedDish));
+    }
+
+    @GetMapping("/{id}/check-stock")
+    public ResponseEntity<Boolean> checkStock(
+            @PathVariable Long id,
+            @RequestParam Integer quantity) {
+        boolean isAvailable = dishService.checkStock(id, quantity);
+        return ResponseEntity.ok(isAvailable);
     }
 
     @PatchMapping("/{id}/availability")

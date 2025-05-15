@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -34,46 +35,48 @@ public class DishService {
         return dishRepository.save(dish);
     }
 
-    public Dish updateDish(Long id, Dish dish) {
-        logger.info("Updating dish with id {}: {}", id, dish);
-        
-        // Log incoming values for critical fields
-        logger.info("Incoming values - category: '{}', quantity: {}", 
-                dish.getCategory(), dish.getQuantity());
-        
-        Dish existingDish = getDish(id);
-        logger.info("Existing dish before update: {}", existingDish);
-        logger.info("Existing values - category: '{}', quantity: {}", 
-                existingDish.getCategory(), existingDish.getQuantity());
-        
-        // Update all fields
-        existingDish.setName(dish.getName());
-        existingDish.setDescription(dish.getDescription());
-        existingDish.setPrice(dish.getPrice());
-        existingDish.setCategory(dish.getCategory());
-        existingDish.setImageUrl(dish.getImageUrl());
-        existingDish.setAvailable(dish.getAvailable());
-        existingDish.setQuantity(dish.getQuantity());
-        existingDish.setSellerId(dish.getSellerId());
-        
-        // Log values after setting but before save
-        logger.info("Updated dish before save: {}", existingDish);
-        logger.info("Updated values before save - category: '{}', quantity: {}", 
-                existingDish.getCategory(), existingDish.getQuantity());
-        
-        // Save the dish
-        Dish updatedDish = dishRepository.save(existingDish);
-        
-        // Log the final result after save
-        logger.info("Dish after save: {}", updatedDish);
-        logger.info("Final values - category: '{}', quantity: {}", 
-                updatedDish.getCategory(), updatedDish.getQuantity());
-        
-        return updatedDish;
+    @Transactional
+    public Dish updateDish(Dish dish) {
+        logger.info("Updating dish: {}", dish);
+        return dishRepository.save(dish);
     }
 
-    public void deleteDish(Long id) {
-        dishRepository.deleteById(id);
+    @Transactional
+    public Dish updateStock(Long id, Integer quantity) {
+        logger.info("Updating stock for dish ID: {} to quantity: {}", id, quantity);
+        Dish dish = getDish(id);
+        dish.setQuantity(quantity);
+        
+        // If quantity is zero or negative, mark as unavailable
+        if (quantity <= 0) {
+            dish.setAvailable(false);
+        }
+        
+        return dishRepository.save(dish);
+    }
+
+    @Transactional
+    public boolean checkStock(Long id, Integer requestedQuantity) {
+        logger.info("Checking stock for dish ID: {}, requested quantity: {}", id, requestedQuantity);
+        Dish dish = dishRepository.findById(id).orElse(null);
+        
+        if (dish == null) {
+            logger.error("Dish not found with ID: {}", id);
+            return false;
+        }
+        
+        if (!dish.getAvailable()) {
+            logger.error("Dish is not available: {}", dish.getName());
+            return false;
+        }
+        
+        if (dish.getQuantity() == null || dish.getQuantity() < requestedQuantity) {
+            logger.error("Insufficient stock for dish: {}. Requested: {}, Available: {}", 
+                dish.getName(), requestedQuantity, dish.getQuantity());
+            return false;
+        }
+        
+        return true;
     }
 
     public Dish updateAvailability(Long id, boolean available) {

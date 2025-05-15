@@ -153,7 +153,9 @@ const OrderHistory = () => {
                                 <span className="order-date">{formatDate(order.createdAt)}</span>
                             </div>
                             <div className="status-container">
-                                {getPaymentStatusBadge(order)}
+                                {order.paymentStatus === 'PAID' && (
+                                    <div className="payment-badge paid">PAID</div>
+                                )}
                                 <div 
                                     className="order-status"
                                     style={{ backgroundColor: getStatusColor(order.status) }}

@@ -1,0 +1,68 @@
+package com.dishes.dishservice.config;
+
+import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RabbitMQConfig {
+    // Exchange names
+    public static final String ORDER_VALIDATION_EXCHANGE = "order.validation.exchange";
+    
+    // Queue names
+    public static final String STOCK_CHECK_QUEUE = "order.stock.check.queue";
+    public static final String ORDER_COMPLETION_QUEUE = "order.completion.queue";
+    
+    // Routing keys
+    public static final String STOCK_CHECK_ROUTING_KEY = "order.stock.check";
+    public static final String PAYMENT_VALIDATION_ROUTING_KEY = "order.payment.validation";
+    public static final String ORDER_COMPLETION_ROUTING_KEY = "order.completion";
+    public static final String ORDER_REJECTION_ROUTING_KEY = "order.rejection";
+    
+    @Bean
+    public DirectExchange orderValidationExchange() {
+        return new DirectExchange(ORDER_VALIDATION_EXCHANGE);
+    }
+    
+    @Bean
+    public Queue stockCheckQueue() {
+        return new Queue(STOCK_CHECK_QUEUE);
+    }
+    
+    @Bean
+    public Queue orderCompletionQueue() {
+        return new Queue(ORDER_COMPLETION_QUEUE);
+    }
+    
+    @Bean
+    public Binding stockCheckBinding() {
+        return BindingBuilder
+                .bind(stockCheckQueue())
+                .to(orderValidationExchange())
+                .with(STOCK_CHECK_ROUTING_KEY);
+    }
+    
+    @Bean
+    public Binding orderCompletionBinding() {
+        return BindingBuilder
+                .bind(orderCompletionQueue())
+                .to(orderValidationExchange())
+                .with(ORDER_COMPLETION_ROUTING_KEY);
+    }
+    
+    @Bean
+    public MessageConverter jsonMessageConverter() {
+        return new Jackson2JsonMessageConverter();
+    }
+    
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+        rabbitTemplate.setMessageConverter(jsonMessageConverter());
+        return rabbitTemplate;
+    }
+} 

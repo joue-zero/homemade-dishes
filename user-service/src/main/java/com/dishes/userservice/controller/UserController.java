@@ -12,7 +12,7 @@ import java.util.List;
 @RequestMapping("/api/users")
 public class UserController {
 
-    @Autowired
+    @Autowired // this is used to inject the UserRepository bean into the UserController class
     private UserRepository userRepository;
 
     @PostMapping("/register")

@@ -1,0 +1,105 @@
+.sales-history {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.sales-history h2 {
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 24px;
+}
+
+.sales-subtitle {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 18px;
+}
+
+.error-message {
+    background-color: #ffebee;
+    color: #c62828;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.no-orders {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-size: 18px;
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+.sales-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.sales-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.sales-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+}
+
+.sales-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.order-id {
+    font-weight: bold;
+    color: #333;
+}
+
+.order-date {
+    color: #666;
+    font-size: 14px;
+}
+
+.customer-name {
+    color: #555;
+    font-size: 14px;
+}
+
+.sales-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #eee;
+}
+
+.payment-badge {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.payment-badge.paid {
+    background-color: #4caf50;
+    color: white;
+} 

@@ -6,6 +6,7 @@ import com.dishes.orderservice.repository.OrderRepository;
 import com.dishes.orderservice.dto.DishDTO;
 import com.dishes.orderservice.dto.UserDTO;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -29,6 +30,7 @@ public class OrderService {
     @Autowired
     private RestTemplate restTemplate;
 
+    @Lazy
     @Autowired
     private OrderValidationService orderValidationService;
 

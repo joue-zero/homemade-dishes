@@ -231,4 +231,12 @@
     margin-top: 20px;
     cursor: pointer;
     font-weight: 500;
+}
+
+.payment-badge.paid {
+    background-color: #4caf50;
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 6px 12px;
 } 
