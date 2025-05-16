@@ -31,19 +31,16 @@ public class DishService {
     }
 
     public Dish createDish(Dish dish) {
-        logger.info("Creating dish: {}", dish);
         return dishRepository.save(dish);
     }
 
     @Transactional
     public Dish updateDish(Dish dish) {
-        logger.info("Updating dish: {}", dish);
         return dishRepository.save(dish);
     }
 
     @Transactional
     public Dish updateStock(Long id, Integer quantity) {
-        logger.info("Updating stock for dish ID: {} to quantity: {}", id, quantity);
         Dish dish = getDish(id);
         dish.setQuantity(quantity);
         
@@ -57,7 +54,6 @@ public class DishService {
 
     @Transactional
     public boolean checkStock(Long id, Integer requestedQuantity) {
-        logger.info("Checking stock for dish ID: {}, requested quantity: {}", id, requestedQuantity);
         Dish dish = dishRepository.findById(id).orElse(null);
         
         if (dish == null) {

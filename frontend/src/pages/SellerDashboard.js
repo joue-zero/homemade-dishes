@@ -120,8 +120,16 @@ const SellerDashboard = () => {
                 }
             });
             
+            // The API now returns SellerOrderDTO objects with sellerItems instead of items
             const fetchedOrders = response.data;
-            setOrders(fetchedOrders);
+            
+            // Transform the data to maintain backward compatibility with our UI
+            const transformedOrders = fetchedOrders.map(order => ({
+                ...order,
+                items: order.sellerItems || [] // Use sellerItems as items for the UI
+            }));
+            
+            setOrders(transformedOrders);
             setError(null);
         } catch (error) {
             console.error('Error fetching orders:', error);
@@ -147,7 +155,8 @@ const SellerDashboard = () => {
                     },
                     timeout: 5000
                 });
-                // Filter for completed orders
+                
+                // Filter for completed orders, note the API returns SellerOrderDTO objects
                 completedOrders = response.data.filter(order => order.status === 'COMPLETED');
             } catch (primaryError) {
                 console.error('Error fetching completed orders from primary endpoint:', primaryError);
@@ -160,13 +169,18 @@ const SellerDashboard = () => {
                     },
                     timeout: 5000
                 });
+                
                 // Filter for completed orders
                 completedOrders = response.data.filter(order => order.status === 'COMPLETED');
             }
             
             // Transform orders into sold dishes format
+            // Check if we have sellerItems (new API) or items (old API)
             const soldDishesData = completedOrders.flatMap(order => {
-                return order.items.map(item => ({
+                // Use sellerItems if available (new API), otherwise fallback to items (old API)
+                const itemsToProcess = order.sellerItems || order.items || [];
+                
+                return itemsToProcess.map(item => ({
                     dishId: item.dishId,
                     orderId: order.id,
                     dishName: item.dishName,
@@ -578,16 +592,28 @@ const SellerDashboard = () => {
                                     <p>Customer: {order.customerName || `# ${order.customerId}`}</p>
                                     <p>Date: {new Date(order.createdAt).toLocaleString()}</p>
                                     <p>Status: {order.status}</p>
+                                    {order.isMultiSellerOrder && (
+                                        <div className="multi-seller-indicator">
+                                            <span>★</span> This order contains items from multiple sellers
+                                        </div>
+                                    )}
                                     <div className="order-items">
                                         {order.items.map(item => (
-                                            <div key={item.id} className="order-item">
+                                            <div key={item.id || `${item.dishId}-${item.quantity}`} className="order-item">
                                                 <p>{item.dishName} x {item.quantity}</p>
-                                                <p>${item.price * item.quantity}</p>
+                                                <p>${(item.price * item.quantity).toFixed(2)}</p>
                                             </div>
                                         ))}
                                     </div>
                                     <div className="order-total">
-                                        <p>Total: ${order.totalAmount}</p>
+                                        {order.sellerSubtotal ? (
+                                            <>
+                                                <p>Your portion: ${order.sellerSubtotal.toFixed(2)}</p>
+                                                <p>Order Total: ${order.totalOrderAmount.toFixed(2)}</p>
+                                            </>
+                                        ) : (
+                                            <p>Total: ${order.totalAmount ? order.totalAmount.toFixed(2) : '0.00'}</p>
+                                        )}
                                     </div>
                                     <div className="order-actions">
                                         {order.status === 'PENDING' && (

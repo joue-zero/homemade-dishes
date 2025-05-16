@@ -25,6 +25,9 @@ public class OrderItem {
 
     @Column(nullable = false)
     private Double subtotal;
+    
+    @Column(name = "seller_id", nullable = false)
+    private Long sellerId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id")
@@ -78,6 +81,14 @@ public class OrderItem {
 
     public void setSubtotal(Double subtotal) {
         this.subtotal = subtotal;
+    }
+    
+    public Long getSellerId() {
+        return sellerId;
+    }
+
+    public void setSellerId(Long sellerId) {
+        this.sellerId = sellerId;
     }
 
     public Order getOrder() {

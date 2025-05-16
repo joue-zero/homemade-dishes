@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -36,8 +37,6 @@ public class PaymentService {
      */
     @Transactional
     public PaymentResponse processPayment(PaymentRequest request) {
-        logger.info("Processing payment for order ID: {}", request.getOrderId());
-        
         Order order = orderService.getOrder(request.getOrderId());
         if (order == null) {
             logger.error("Order not found: {}", request.getOrderId());
@@ -56,7 +55,6 @@ public class PaymentService {
         
         // Check if payment already processed
         if (order.getPaymentStatus() == Order.PaymentStatus.PAID) {
-            logger.info("Payment already processed for order: {}", request.getOrderId());
             return PaymentResponse.success(request.getOrderId());
         }
         
@@ -86,7 +84,17 @@ public class PaymentService {
             
             // Get current balance
             String balanceUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
-            BigDecimal currentBalance = restTemplate.getForObject(balanceUrl, BigDecimal.class);
+            BigDecimal currentBalance;
+            try {
+                currentBalance = restTemplate.getForObject(balanceUrl, BigDecimal.class);
+            } catch (HttpClientErrorException.NotFound e) {
+                // Silently handle 404 errors - user service not available
+                logger.warn("User service not available for balance check");
+                return PaymentResponse.failed(
+                    request.getOrderId(),
+                    "User service temporarily unavailable"
+                );
+            }
             
             // Check if balance is sufficient
             if (currentBalance == null || currentBalance.compareTo(orderAmount) < 0) {
@@ -105,13 +113,11 @@ public class PaymentService {
             
             // Call user service to update balance
             restTemplate.postForObject(balanceUrl, payload, BigDecimal.class);
-            logger.info("Updated user balance for customer ID: {}, deducted amount: {}", customerId, orderAmount);
             
             // Update order payment status to paid
             order.setPaymentStatus(Order.PaymentStatus.PAID);
             orderService.createOrder(order);
             
-            logger.info("Payment succeeded for order: {}", request.getOrderId());
             return PaymentResponse.success(request.getOrderId());
         } catch (Exception e) {
             logger.error("Error processing payment: {}", e.getMessage(), e);
@@ -125,7 +131,6 @@ public class PaymentService {
      * @return The payment status
      */
     public Order.PaymentStatus getPaymentStatus(Long orderId) {
-        logger.info("Getting payment status for order: {}", orderId);
         Order order = orderService.getOrder(orderId);
         if (order == null) {
             logger.error("Order not found: {}", orderId);

@@ -21,9 +21,6 @@ public class Order {
     @Column(name = "customer_name")
     private String customerName;
 
-    @Column(name = "seller_id")
-    private Long sellerId;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
@@ -94,14 +91,6 @@ public class Order {
 
     public void setCustomerName(String customerName) {
         this.customerName = customerName;
-    }
-
-    public Long getSellerId() {
-        return sellerId;
-    }
-
-    public void setSellerId(Long sellerId) {
-        this.sellerId = sellerId;
     }
 
     public OrderStatus getStatus() {

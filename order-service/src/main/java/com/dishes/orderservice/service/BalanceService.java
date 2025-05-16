@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -26,8 +27,6 @@ public class BalanceService {
      */
     @Transactional
     public BalanceDTO getUserBalance(Long userId) {
-        logger.info("Getting balance for user ID: {} from user service", userId);
-        
         try {
             String balanceUrl = USER_SERVICE_URL + "/" + userId + "/balance";
             BigDecimal balance = restTemplate.getForObject(balanceUrl, BigDecimal.class);
@@ -37,6 +36,10 @@ public class BalanceService {
             balanceDTO.setBalance(balance);
             
             return balanceDTO;
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            // Silently handle 404 errors - user service not available
+            logger.warn("User service not available for balance check: {}", userId);
+            throw new RuntimeException("User service unavailable");
         } catch (Exception e) {
             logger.error("Error fetching balance from user service: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to get user balance: " + e.getMessage());
@@ -48,8 +51,6 @@ public class BalanceService {
      */
     @Transactional
     public BalanceDTO updateBalance(Long userId, BigDecimal amount) {
-        logger.info("Updating balance for user ID: {} with amount: {} via user service", userId, amount);
-        
         try {
             String balanceUrl = USER_SERVICE_URL + "/" + userId + "/balance";
             

@@ -10,7 +10,6 @@ import java.util.List;
 public class OrderValidationMessage implements Serializable {
     private Long orderId;
     private Long customerId;
-    private Long sellerId;
     private BigDecimal totalAmount;
     private List<OrderItemInfo> items;
     private boolean stockAvailable = false;
@@ -22,6 +21,7 @@ public class OrderValidationMessage implements Serializable {
         private Long dishId;
         private String dishName;
         private Integer quantity;
+        private Long sellerId;
     }
     
     // Static factory method to create from Order entity
@@ -29,7 +29,6 @@ public class OrderValidationMessage implements Serializable {
         OrderValidationMessage message = new OrderValidationMessage();
         message.setOrderId(order.getId());
         message.setCustomerId(order.getCustomerId());
-        message.setSellerId(order.getSellerId());
         message.setTotalAmount(order.getTotalAmount());
         
         // Convert OrderItems to OrderItemInfo
@@ -39,6 +38,7 @@ public class OrderValidationMessage implements Serializable {
                     itemInfo.setDishId(orderItem.getDishId());
                     itemInfo.setDishName(orderItem.getDishName());
                     itemInfo.setQuantity(orderItem.getQuantity());
+                    itemInfo.setSellerId(orderItem.getSellerId());
                     return itemInfo;
                 })
                 .toList();

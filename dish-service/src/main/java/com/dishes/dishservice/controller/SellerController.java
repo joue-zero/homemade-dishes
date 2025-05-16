@@ -20,9 +20,7 @@ public class SellerController {
 
     @GetMapping("/{sellerId}/dishes")
     public ResponseEntity<List<Dish>> getSellerDishes(@PathVariable Long sellerId) {
-        logger.info("Fetching dishes for seller: {}", sellerId);
         List<Dish> dishes = dishService.getDishesBySeller(sellerId);
-        logger.info("Found {} dishes for seller: {}", dishes.size(), sellerId);
         return ResponseEntity.ok(dishes);
     }
 
@@ -30,13 +28,8 @@ public class SellerController {
     public ResponseEntity<Dish> createDish(
             @PathVariable Long sellerId, 
             @RequestBody Dish dish) {
-        logger.info("Creating dish for seller: {}", sellerId);
-        logger.info("Received dish: {}", dish);
-
         dish.setSellerId(sellerId);
         Dish createdDish = dishService.createDish(dish);
-        logger.info("Dish created successfully: {}", createdDish);
-        
         return ResponseEntity.ok(createdDish);
     }
 
@@ -45,15 +38,10 @@ public class SellerController {
             @PathVariable Long sellerId, 
             @PathVariable Long dishId, 
             @RequestBody Dish dish) {
-        logger.info("Updating dish {} for seller {}", dishId, sellerId);
-        logger.info("Received dish object: {}", dish);
-        
         dish.setSellerId(sellerId);
         dish.setId(dishId); // Ensure ID is set correctly
         
         Dish updatedDish = dishService.updateDish(dish);
-        logger.info("Dish updated successfully: {}", updatedDish);
-        
         return ResponseEntity.ok(updatedDish);
     }
 
@@ -62,9 +50,7 @@ public class SellerController {
             @PathVariable Long sellerId, 
             @PathVariable Long dishId, 
             @RequestParam boolean available) {
-        logger.info("Updating availability of dish {} for seller {} to: {}", dishId, sellerId, available);
         Dish updatedDish = dishService.updateAvailability(dishId, available);
-        logger.info("Dish availability updated successfully: {}", updatedDish);
         return ResponseEntity.ok(updatedDish);
     }
     
@@ -73,9 +59,7 @@ public class SellerController {
             @PathVariable Long sellerId, 
             @PathVariable Long dishId, 
             @RequestParam Integer quantity) {
-        logger.info("Updating stock of dish {} for seller {} to: {}", dishId, sellerId, quantity);
         Dish updatedDish = dishService.updateStock(dishId, quantity);
-        logger.info("Dish stock updated successfully: {}", updatedDish);
         return ResponseEntity.ok(updatedDish);
     }
 } 

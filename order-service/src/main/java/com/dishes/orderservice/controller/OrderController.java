@@ -2,8 +2,10 @@ package com.dishes.orderservice.controller;
 
 import com.dishes.orderservice.dto.OrderDTO;
 import com.dishes.orderservice.dto.OrderStatusUpdateRequest;
+import com.dishes.orderservice.dto.SellerOrderDTO;
 import com.dishes.orderservice.mapper.OrderMapper;
 import com.dishes.orderservice.model.Order;
+import com.dishes.orderservice.model.OrderItem;
 import com.dishes.orderservice.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -15,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -112,22 +115,29 @@ public class OrderController {
     }
 
     @GetMapping("/seller/{sellerId}")
-    public ResponseEntity<List<Order>> getOrdersBySeller(@PathVariable Long sellerId) {
+    public ResponseEntity<List<SellerOrderDTO>> getOrdersBySeller(@PathVariable Long sellerId) {
         logger.info("Fetching orders for seller ID: {}", sellerId);
         List<Order> orders = orderService.getOrdersBySeller(sellerId);
-        logger.info("Found {} orders for seller ID: {}", orders.size(), sellerId);
+        
+        // Convert to seller-specific DTOs
+        List<SellerOrderDTO> sellerOrders = orders.stream()
+            .map(order -> SellerOrderDTO.fromOrder(order, sellerId))
+            .toList();
+        
+        logger.info("Found {} orders for seller ID: {}", sellerOrders.size(), sellerId);
         
         // Log order details for debugging
-        if (orders.isEmpty()) {
+        if (sellerOrders.isEmpty()) {
             logger.warn("No orders found for seller ID: {}", sellerId);
         } else {
-            for (Order order : orders) {
-                logger.debug("Order: id={}, status={}, customerId={}, items={}", 
-                    order.getId(), order.getStatus(), order.getCustomerId(), order.getItems().size());
+            for (SellerOrderDTO order : sellerOrders) {
+                logger.debug("Order: id={}, status={}, customerId={}, sellerItems={}, isMultiSeller={}", 
+                    order.getId(), order.getStatus(), order.getCustomerId(), 
+                    order.getSellerItems().size(), order.isMultiSellerOrder());
             }
         }
         
-        return ResponseEntity.ok(orders);
+        return ResponseEntity.ok(sellerOrders);
     }
 
     @GetMapping("/customer/{customerId}")
@@ -144,5 +154,34 @@ public class OrderController {
         Order createdOrder = orderService.createOrder(order);
         logger.info("Order created successfully: {}", createdOrder);
         return ResponseEntity.ok(createdOrder);
+    }
+
+    @GetMapping("/seller/{sellerId}/order/{orderId}")
+    public ResponseEntity<?> getSellerOrder(@PathVariable Long sellerId, @PathVariable Long orderId) {
+        logger.info("Fetching order {} for seller ID: {}", orderId, sellerId);
+        
+        try {
+            Order order = orderService.getOrder(orderId);
+            
+            // Check if this order has any items from this seller
+            boolean hasSellersItems = order.getItems().stream()
+                .anyMatch(item -> sellerId.equals(item.getSellerId()));
+            
+            if (!hasSellersItems) {
+                logger.warn("Order {} does not contain items from seller {}", orderId, sellerId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("This order does not contain any items from your inventory");
+            }
+            
+            // Convert to seller-specific DTO
+            SellerOrderDTO sellerOrder = SellerOrderDTO.fromOrder(order, sellerId);
+            
+            return ResponseEntity.ok(sellerOrder);
+            
+        } catch (Exception e) {
+            logger.error("Error fetching order {} for seller {}: {}", orderId, sellerId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Error fetching order: " + e.getMessage());
+        }
     }
 } 

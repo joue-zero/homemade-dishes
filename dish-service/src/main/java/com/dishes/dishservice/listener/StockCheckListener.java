@@ -63,7 +63,6 @@ public class StockCheckListener {
         
         message.setStockAvailable(allItemsInStock);
         message.setValidationMessage(validationMessageBuilder.toString());
-        logger.info("Dish service stock check complete: allInStock={}", allItemsInStock);
         
         // Send the result back to the same queue for the order service to pick up
         // The order service will handle the next steps based on this result
@@ -105,7 +104,6 @@ public class StockCheckListener {
                     
                     // Update dish
                     dishService.updateDish(dish);
-                    logger.info("Updated inventory for dish: {}, new quantity: {}", dish.getName(), newQuantity);
                 }
             } catch (Exception e) {
                 logger.error("Error updating inventory for dish: {}", item.getDishId(), e);

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -36,9 +37,6 @@ public class OrderService {
 
     @Transactional
     public Order createOrder(Long userId, List<Map<String, Object>> items) {
-        logger.info("Creating order for user: {}", userId);
-        logger.info("Order items: {}", items);
-
         if (userId == null) {
             logger.error("User ID cannot be null");
             throw new RuntimeException("User ID cannot be null");
@@ -64,7 +62,6 @@ public class OrderService {
         
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
-        Long dishSellerId = null;
 
         for (Map<String, Object> item : items) {
             try {
@@ -80,7 +77,6 @@ public class OrderService {
                 
                 Long dishId = Long.valueOf(item.get("dishId").toString());
                 Integer quantity = Integer.valueOf(item.get("quantity").toString());
-                logger.info("Processing dish: id={}, quantity={}", dishId, quantity);
 
                 // Get dish details from dish service
                 String dishServiceUrl = DISH_SERVICE_URL + "/" + dishId;
@@ -96,18 +92,6 @@ public class OrderService {
                         logger.error("Dish is not available: {}", dish.getName());
                         throw new RuntimeException("Dish is not available: " + dish.getName());
                     }
-                    
-                    // If this is the first dish, store the seller ID
-                    // Assuming all dishes in the order are from the same seller
-                    if (dishSellerId == null && dish.getSellerId() != null) {
-                        dishSellerId = dish.getSellerId();
-                        order.setSellerId(dishSellerId);
-                        logger.info("Set seller ID to: {}", dishSellerId);
-                    } else if (dish.getSellerId() != null && !dish.getSellerId().equals(dishSellerId)) {
-                        // If we found a dish with a different seller ID, log a warning
-                        logger.warn("Dish {} has different seller ID {} than previous dishes {}",
-                            dishId, dish.getSellerId(), dishSellerId);
-                    }
 
                     OrderItem orderItem = new OrderItem();
                     orderItem.setDishId(dishId);
@@ -115,10 +99,10 @@ public class OrderService {
                     orderItem.setPrice(dish.getPrice().doubleValue());
                     orderItem.setQuantity(quantity);
                     orderItem.setSubtotal(dish.getPrice().doubleValue() * quantity);
+                    orderItem.setSellerId(dish.getSellerId());
                     orderItem.setOrder(order);
                     orderItems.add(orderItem);
                     totalAmount = totalAmount.add(BigDecimal.valueOf(orderItem.getSubtotal()));
-                    logger.info("Added item to order: {}", orderItem);
                 } catch (Exception e) {
                     logger.error("Error fetching dish from dish service: {}", e.getMessage(), e);
                     throw new RuntimeException("Error fetching dish details: " + e.getMessage());
@@ -135,8 +119,6 @@ public class OrderService {
 
         order.setItems(orderItems);
         order.setTotalAmount(totalAmount);
-        logger.info("Saving order with total amount: {}, sellerId: {}, customerName: {}", 
-            totalAmount, order.getSellerId(), order.getCustomerName());
         Order savedOrder = orderRepository.save(order);
         
         // Trigger order validation after saving
@@ -161,8 +143,6 @@ public class OrderService {
 
     @Transactional
     public Order updateOrderStatus(Long orderId, Order.OrderStatus status) {
-        logger.info("Service: Updating order status for orderId={} to {}", orderId, status);
-        
         if (orderId == null) {
             logger.error("Order ID cannot be null");
             throw new RuntimeException("Order ID cannot be null");
@@ -180,12 +160,8 @@ public class OrderService {
                         return new RuntimeException("Order not found with id: " + orderId);
                     });
             
-            // Log the current and new status
-            logger.info("Changing order status from {} to {}", order.getStatus(), status);
             order.setStatus(status);
-            
             Order savedOrder = orderRepository.save(order);
-            logger.info("Order status updated successfully: {}", savedOrder);
             return savedOrder;
         } catch (Exception e) {
             logger.error("Error updating order status: {}", e.getMessage(), e);
@@ -204,7 +180,20 @@ public class OrderService {
     }
 
     public List<Order> getOrdersBySeller(Long sellerId) {
-        return orderRepository.findBySellerId(sellerId);
+        // Modified to search for orders containing items from a specific seller
+        List<Order> allOrders = orderRepository.findAll();
+        List<Order> sellerOrders = new ArrayList<>();
+        
+        for (Order order : allOrders) {
+            for (OrderItem item : order.getItems()) {
+                if (item.getSellerId() != null && item.getSellerId().equals(sellerId)) {
+                    sellerOrders.add(order);
+                    break;
+                }
+            }
+        }
+        
+        return sellerOrders;
     }
 
     public List<Order> getOrdersByCustomer(Long customerId) {
@@ -213,81 +202,46 @@ public class OrderService {
 
     @Transactional
     public Order createOrder(Order order) {
-        logger.info("Creating order directly with provided data: {}", order);
-        
         if (order.getCustomerId() == null) {
             logger.error("Customer ID cannot be null");
             throw new RuntimeException("Customer ID cannot be null");
         }
-        
-        // If customer name is missing, try to fetch it
-        if (order.getCustomerName() == null || order.getCustomerName().trim().isEmpty()) {
-            logger.info("Customer name not provided, attempting to fetch from user service");
+
+        if (order.getCustomerName() == null) {
             UserDTO user = fetchUserInfo(order.getCustomerId());
-            if (user != null && user.getUsername() != null) {
+            if (user != null) {
                 order.setCustomerName(user.getUsername());
-                logger.info("Set customer name to: {}", user.getUsername());
             }
         }
         
-        // Ensure there is a status set
         if (order.getStatus() == null) {
             order.setStatus(Order.OrderStatus.PENDING);
         }
         
-        // Make sure all order items have the correct order reference
-        if (order.getItems() != null) {
-            for (OrderItem item : order.getItems()) {
-                item.setOrder(order);
+        // Save order with items
+        Order savedOrder = orderRepository.save(order);
+        
+        // Start validation if the order is pending
+        if (savedOrder.getStatus() == Order.OrderStatus.PENDING) {
+            try {
+                orderValidationService.startOrderValidation(savedOrder);
+            } catch (Exception e) {
+                logger.error("Error initiating order validation: {}", e.getMessage(), e);
             }
         }
         
-        logger.info("Saving order with customer ID: {}, seller ID: {}, customer name: {}", 
-            order.getCustomerId(), order.getSellerId(), order.getCustomerName());
-        return orderRepository.save(order);
+        return savedOrder;
     }
 
-    /**
-     * Helper method to fetch user information
-     * @param userId ID of the user to fetch
-     * @return UserDTO if found, null otherwise
-     */
     private UserDTO fetchUserInfo(Long userId) {
-        if (userId == null) {
-            logger.warn("Cannot fetch user info for null user ID");
-            return null;
-        }
-        
         try {
-            // Try direct endpoint first
-            String directUrl = USER_SERVICE_BASE_URL + "/" + userId;
-            logger.info("Attempting to fetch user info from: {}", directUrl);
-            
-            try {
-                UserDTO user = restTemplate.getForObject(directUrl, UserDTO.class);
-                if (user != null && user.getId() != null) {
-                    logger.info("Successfully fetched user: {}", user.getUsername());
-                    return user;
-                }
-            } catch (Exception e) {
-                logger.warn("Error fetching user from direct endpoint: {}", e.getMessage());
-            }
-            
-            // If direct endpoint fails, try a different format
-            String alternateUrl = USER_SERVICE_BASE_URL + "/id/" + userId;
-            logger.info("Attempting to fetch user info from alternate endpoint: {}", alternateUrl);
-            
-            UserDTO user = restTemplate.getForObject(alternateUrl, UserDTO.class);
-            if (user != null && user.getId() != null) {
-                logger.info("Successfully fetched user from alternate endpoint: {}", user.getUsername());
-                return user;
-            }
-            
-            logger.warn("Could not find user with ID: {}", userId);
+            String userServiceUrl = USER_SERVICE_BASE_URL + "/" + userId;
+            return restTemplate.getForObject(userServiceUrl, UserDTO.class);
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            // Silently handle 404 errors - user service not available
             return null;
-            
         } catch (Exception e) {
-            logger.error("Failed to fetch user info for user ID {}: {}", userId, e.getMessage());
+            logger.error("Error fetching user information: {}", e.getMessage(), e);
             return null;
         }
     }

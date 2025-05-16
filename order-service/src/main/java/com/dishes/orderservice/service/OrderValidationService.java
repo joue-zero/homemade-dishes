@@ -47,11 +47,9 @@ public class OrderValidationService {
      */
     public void startOrderValidation(Order order) {
         try {
-            logger.info("Starting order validation for order ID: {}", order.getId());
             OrderValidationMessage message = OrderValidationMessage.fromOrder(order);
             
             if (rabbitTemplate != null) {
-                logger.info("💤 DELAY: Waiting 2 seconds before sending to stock check queue...");
                 rabbitTemplate.convertAndSend(
                     OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
                     OrderValidationConfig.STOCK_CHECK_ROUTING_KEY,
@@ -73,8 +71,6 @@ public class OrderValidationService {
      * Direct validation and completion of order without using message queue
      */
     private void validateAndCompleteOrder(Order order) {
-        logger.info("Processing order {} directly without message queue", order.getId());
-        
         // Validate user balance first
         try {
             Long customerId = order.getCustomerId();
@@ -110,9 +106,6 @@ public class OrderValidationService {
                 return;
             }
             
-            logger.info("User {} has sufficient balance: ${} for order amount: ${}", 
-                customerId, userBalance, totalAmount);
-            
             // Update the user's balance
             String balanceUpdateUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
             
@@ -122,14 +115,11 @@ public class OrderValidationService {
             
             // Call user service to update balance
             restTemplate.postForObject(balanceUpdateUrl, payload, BigDecimal.class);
-            logger.info("Updated user balance for customer ID: {}, deducted amount: {}", customerId, totalAmount);
             
             // Mark order as completed
             order.setStatus(Order.OrderStatus.COMPLETED);
             order.setPaymentStatus(Order.PaymentStatus.PAID);
             orderService.createOrder(order);
-            
-            logger.info("Order ID: {} completed successfully via direct processing", order.getId());
         } catch (Exception e) {
             logger.error("Error processing order directly: {}", e.getMessage(), e);
             // Mark order as rejected if there's an error
@@ -145,7 +135,6 @@ public class OrderValidationService {
      */
     @Transactional
     public void checkStock(OrderValidationMessage message) {
-        logger.info("Checking stock for order ID: {}", message.getOrderId());
         boolean allItemsInStock = true;
         StringBuilder validationMessageBuilder = new StringBuilder();
         
@@ -187,18 +176,13 @@ public class OrderValidationService {
         message.setStockAvailable(allItemsInStock);
         message.setValidationMessage(validationMessageBuilder.toString());
         
-        // Add a delay before sending the message to the next queue
-        logger.info("💤 DELAY: Waiting 2 seconds before sending to next queue...");
-        
         if (allItemsInStock) {
-            logger.info("Stock check passed for order ID: {}, proceeding to payment validation", message.getOrderId());
             rabbitTemplate.convertAndSend(
                 OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
                 OrderValidationConfig.PAYMENT_VALIDATION_ROUTING_KEY,
                 message
             );
         } else {
-            logger.info("Stock check failed for order ID: {}, rejecting order", message.getOrderId());
             rabbitTemplate.convertAndSend(
                 OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
                 OrderValidationConfig.ORDER_REJECTION_ROUTING_KEY,
@@ -213,7 +197,6 @@ public class OrderValidationService {
      */
     @Transactional
     public void validatePayment(OrderValidationMessage message) {
-        logger.info("Validating payment for order ID: {}", message.getOrderId());
         boolean paymentValid = true;
         StringBuilder validationMessageBuilder = new StringBuilder();
         
@@ -225,8 +208,6 @@ public class OrderValidationService {
                 .append(" is below minimum charge of $")
                 .append(minimumOrderCharge)
                 .append("; ");
-            logger.info("Order amount ${} is below minimum charge of ${}", 
-                message.getTotalAmount(), minimumOrderCharge);
             
             // Send payment failure notification to admin via direct exchange
             rabbitTemplate.convertAndSend(
@@ -283,9 +264,6 @@ public class OrderValidationService {
                 // Log error
                 loggingService.logError("Payment validation failed: Insufficient balance for user " + customerId);
             } else {
-                logger.info("User {} has sufficient balance: ${} for order amount: ${}", 
-                    customerId, userBalance, orderAmount);
-                
                 // Log info
                 loggingService.logInfo("Payment validation successful for order " + message.getOrderId());
             }
@@ -319,11 +297,6 @@ public class OrderValidationService {
             OrderValidationConfig.ORDER_COMPLETION_ROUTING_KEY : 
             OrderValidationConfig.ORDER_REJECTION_ROUTING_KEY;
             
-        logger.info("Payment validation for order ID: {} - Valid: {}", message.getOrderId(), paymentValid);
-        
-        // Add a delay before sending the message to the next queue
-        logger.info("💤 DELAY: Waiting 2 seconds before sending to next queue...");
-        
         rabbitTemplate.convertAndSend(
             OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
             routingKey,
@@ -337,8 +310,6 @@ public class OrderValidationService {
      */
     @Transactional
     public void completeOrder(OrderValidationMessage message) {
-        logger.info("Completing order ID: {}", message.getOrderId());
-        
         // Update order status
         Order order = orderService.getOrder(message.getOrderId());
         order.setStatus(Order.OrderStatus.COMPLETED);
@@ -358,7 +329,6 @@ public class OrderValidationService {
             
             // Call user service to update balance
             restTemplate.postForObject(balanceUrl, payload, BigDecimal.class);
-            logger.info("Updated user balance for customer ID: {}, deducted amount: {}", customerId, totalAmount);
         } catch (Exception e) {
             logger.error("Error updating user balance: {}", e.getMessage(), e);
         }
@@ -382,14 +352,11 @@ public class OrderValidationService {
                     
                     // Update dish in dish service
                     restTemplate.put(dishServiceUrl, dish);
-                    logger.info("Updated inventory for dish: {}, new quantity: {}", dish.getName(), newQuantity);
                 }
             } catch (Exception e) {
                 logger.error("Error updating inventory for dish: {}", item.getDishId(), e);
             }
         }
-        
-        logger.info("Order ID: {} completed successfully", message.getOrderId());
     }
 
     /**
@@ -398,8 +365,6 @@ public class OrderValidationService {
      */
     @Transactional
     public void rejectOrder(OrderValidationMessage message) {
-        logger.info("Rejecting order ID: {}", message.getOrderId());
-        
         // Update order status
         Order order = orderService.getOrder(message.getOrderId());
         order.setStatus(Order.OrderStatus.REJECTED);
@@ -422,7 +387,5 @@ public class OrderValidationService {
         }
         
         orderService.createOrder(order); // Save updated order
-        
-        logger.info("Order ID: {} rejected with reason: {}", message.getOrderId(), message.getValidationMessage());
     }
 } 

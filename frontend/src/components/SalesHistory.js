@@ -26,7 +26,15 @@ const SalesHistory = () => {
             
             // Filter to only show orders with PAID payment status
             const paidOrders = response.filter(order => order.paymentStatus === 'PAID');
-            setOrders(paidOrders);
+            
+            // Transform orders to ensure they have all required properties
+            const transformedOrders = paidOrders.map(order => ({
+                ...order,
+                // Use sellerItems (new API) and fall back to items (old API) if needed
+                items: order.sellerItems || order.items || []
+            }));
+            
+            setOrders(transformedOrders);
         } catch (err) {
             setError(err.message || 'Failed to fetch sales data');
         } finally {
@@ -84,16 +92,20 @@ const SalesHistory = () => {
                         </div>
                         <div className="order-items">
                             {order.items.map(item => (
-                                <div key={item.id} className="order-item">
+                                <div key={item.id || `${item.dishId}-${item.quantity}`} className="order-item">
                                     <span className="item-name">{item.dishName}</span>
                                     <span className="item-quantity">x{item.quantity}</span>
-                                    <span className="item-price">${Math.round(item.price * item.quantity)}</span>
+                                    <span className="item-price">${(item.price * item.quantity).toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
                         <div className="sales-footer">
                             <div className="order-total">
-                                Total: ${order.totalAmount.toFixed(2)}
+                                {order.sellerSubtotal ? (
+                                    <span>Your Total: ${order.sellerSubtotal.toFixed(2)}</span>
+                                ) : (
+                                    <span>Total: ${order.totalAmount ? order.totalAmount.toFixed(2) : '0.00'}</span>
+                                )}
                             </div>
                             <div className="payment-badge paid">Payment: PAID</div>
                         </div>

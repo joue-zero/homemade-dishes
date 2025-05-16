@@ -345,4 +345,22 @@
 .info-section p {
     margin: 5px 0;
     color: #666;
+}
+
+.multi-seller-indicator {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 8px;
+    margin: 10px 0;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    border-left: 3px solid #ffc107;
+    display: flex;
+    align-items: center;
+}
+
+.multi-seller-indicator span {
+    margin-right: 6px;
+    color: #ffc107;
+    font-size: 1.2rem;
 } 
