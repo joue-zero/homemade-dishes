@@ -47,6 +47,7 @@ public class OrderValidationService {
             OrderValidationMessage message = OrderValidationMessage.fromOrder(order);
             
             if (rabbitTemplate != null) {
+                logger.info("💤 DELAY: Waiting 2 seconds before sending to stock check queue...");
                 rabbitTemplate.convertAndSend(
                     OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
                     OrderValidationConfig.STOCK_CHECK_ROUTING_KEY,
@@ -70,19 +71,53 @@ public class OrderValidationService {
     private void validateAndCompleteOrder(Order order) {
         logger.info("Processing order {} directly without message queue", order.getId());
         
-        // Update the user's balance
+        // Validate user balance first
         try {
             Long customerId = order.getCustomerId();
             BigDecimal totalAmount = order.getTotalAmount();
             
+            // Check if order amount meets minimum charge
+            if (totalAmount.compareTo(minimumOrderCharge) < 0) {
+                logger.error("Order amount ${} is below minimum charge of ${}", totalAmount, minimumOrderCharge);
+                order.setStatus(Order.OrderStatus.REJECTED);
+                order.setPaymentStatus(Order.PaymentStatus.FAILED);
+                orderService.createOrder(order);
+                return;
+            }
+            
+            // Check user balance
             String balanceUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
+            BigDecimal userBalance = restTemplate.getForObject(balanceUrl, BigDecimal.class);
+            
+            if (userBalance == null) {
+                logger.error("Could not retrieve balance for user ID: {}", customerId);
+                order.setStatus(Order.OrderStatus.REJECTED);
+                order.setPaymentStatus(Order.PaymentStatus.FAILED);
+                orderService.createOrder(order);
+                return;
+            }
+            
+            if (userBalance.compareTo(totalAmount) < 0) {
+                logger.error("Insufficient balance: User {} has ${} but order requires ${}", 
+                    customerId, userBalance, totalAmount);
+                order.setStatus(Order.OrderStatus.REJECTED);
+                order.setPaymentStatus(Order.PaymentStatus.FAILED);
+                orderService.createOrder(order);
+                return;
+            }
+            
+            logger.info("User {} has sufficient balance: ${} for order amount: ${}", 
+                customerId, userBalance, totalAmount);
+            
+            // Update the user's balance
+            String balanceUpdateUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
             
             // Create payload for balance update
             Map<String, Object> payload = new HashMap<>();
             payload.put("amount", totalAmount);
             
             // Call user service to update balance
-            restTemplate.postForObject(balanceUrl, payload, BigDecimal.class);
+            restTemplate.postForObject(balanceUpdateUrl, payload, BigDecimal.class);
             logger.info("Updated user balance for customer ID: {}, deducted amount: {}", customerId, totalAmount);
             
             // Mark order as completed
@@ -95,6 +130,7 @@ public class OrderValidationService {
             logger.error("Error processing order directly: {}", e.getMessage(), e);
             // Mark order as rejected if there's an error
             order.setStatus(Order.OrderStatus.REJECTED);
+            order.setPaymentStatus(Order.PaymentStatus.FAILED);
             orderService.createOrder(order);
         }
     }
@@ -147,6 +183,9 @@ public class OrderValidationService {
         message.setStockAvailable(allItemsInStock);
         message.setValidationMessage(validationMessageBuilder.toString());
         
+        // Add a delay before sending the message to the next queue
+        logger.info("💤 DELAY: Waiting 2 seconds before sending to next queue...");
+        
         if (allItemsInStock) {
             logger.info("Stock check passed for order ID: {}, proceeding to payment validation", message.getOrderId());
             rabbitTemplate.convertAndSend(
@@ -186,6 +225,41 @@ public class OrderValidationService {
                 message.getTotalAmount(), minimumOrderCharge);
         }
         
+        // Check if user has sufficient balance
+        try {
+            Order order = orderService.getOrder(message.getOrderId());
+            Long customerId = order.getCustomerId();
+            BigDecimal orderAmount = order.getTotalAmount();
+            
+            // Get current user balance
+            String balanceUrl = USER_SERVICE_URL + "/" + customerId + "/balance";
+            BigDecimal userBalance = restTemplate.getForObject(balanceUrl, BigDecimal.class);
+            
+            if (userBalance == null) {
+                logger.error("Could not retrieve balance for user ID: {}", customerId);
+                paymentValid = false;
+                validationMessageBuilder.append("Could not validate user balance; ");
+            } else if (userBalance.compareTo(orderAmount) < 0) {
+                logger.error("Insufficient balance: User {} has ${} but order requires ${}", 
+                    customerId, userBalance, orderAmount);
+                paymentValid = false;
+                validationMessageBuilder.append("Insufficient balance: You have $")
+                    .append(userBalance)
+                    .append(" but the order requires $")
+                    .append(orderAmount)
+                    .append("; ");
+            } else {
+                logger.info("User {} has sufficient balance: ${} for order amount: ${}", 
+                    customerId, userBalance, orderAmount);
+            }
+        } catch (Exception e) {
+            logger.error("Error checking user balance: {}", e.getMessage(), e);
+            paymentValid = false;
+            validationMessageBuilder.append("Error checking user balance: ")
+                .append(e.getMessage())
+                .append("; ");
+        }
+        
         // Additional payment validations can be added here
         
         message.setPaymentValidated(paymentValid);
@@ -199,7 +273,10 @@ public class OrderValidationService {
             OrderValidationConfig.ORDER_REJECTION_ROUTING_KEY;
             
         logger.info("Payment validation for order ID: {} - Valid: {}", message.getOrderId(), paymentValid);
-            
+        
+        // Add a delay before sending the message to the next queue
+        logger.info("💤 DELAY: Waiting 2 seconds before sending to next queue...");
+        
         rabbitTemplate.convertAndSend(
             OrderValidationConfig.ORDER_VALIDATION_EXCHANGE,
             routingKey,

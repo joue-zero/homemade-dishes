@@ -37,6 +37,19 @@ public class OrderValidationConfig {
     
     @Autowired
     private OrderValidationService orderValidationService;
+    
+    // Message converter for RabbitMQ
+    @Bean
+    public MessageConverter jsonMessageConverter() {
+        return new Jackson2JsonMessageConverter();
+    }
+    
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        template.setMessageConverter(jsonMessageConverter());
+        return template;
+    }
 
     // Define exchange
     @Bean

@@ -12,51 +12,86 @@ import org.springframework.stereotype.Component;
 @Component
 public class OrderValidationListener {
     private static final Logger logger = LoggerFactory.getLogger(OrderValidationListener.class);
+    private static final String SEPARATOR = "=================================================";
     
     @Autowired
     private OrderValidationService orderValidationService;
     
     @RabbitListener(queues = OrderValidationConfig.STOCK_CHECK_QUEUE)
     public void handleStockCheck(OrderValidationMessage message) {
-        logger.info("Received stock check request for order ID: {}", message.getOrderId());
+        logRabbitMessage("STOCK CHECK", message.getOrderId());
+        
         try {
+            // Add 5 second delay to allow time to see messages in RabbitMQ Management UI
+            // Thread.sleep(5000);
+            
             orderValidationService.checkStock(message);
-            logger.info("Stock check completed for order ID: {}", message.getOrderId());
         } catch (Exception e) {
-            logger.error("Error processing stock check for order ID: {}: {}", message.getOrderId(), e.getMessage(), e);
+            logger.error("ERROR in RabbitMQ processing: {}", e.getMessage(), e);
         }
+        
+        logger.info(SEPARATOR);
     }
     
     @RabbitListener(queues = OrderValidationConfig.PAYMENT_VALIDATION_QUEUE)
     public void handlePaymentValidation(OrderValidationMessage message) {
-        logger.info("Received payment validation request for order ID: {}", message.getOrderId());
+        logRabbitMessage("PAYMENT VALIDATION", message.getOrderId());
+        
         try {
+            // Add 5 second delay to allow time to see messages in RabbitMQ Management UI
+            // Thread.sleep(5000);
+            
             orderValidationService.validatePayment(message);
-            logger.info("Payment validation completed for order ID: {}", message.getOrderId());
         } catch (Exception e) {
-            logger.error("Error processing payment validation for order ID: {}: {}", message.getOrderId(), e.getMessage(), e);
+            logger.error("ERROR in RabbitMQ processing: {}", e.getMessage(), e);
         }
+        
+        logger.info(SEPARATOR);
     }
     
     @RabbitListener(queues = OrderValidationConfig.ORDER_COMPLETION_QUEUE)
     public void handleOrderCompletion(OrderValidationMessage message) {
-        logger.info("Received order completion request for order ID: {}", message.getOrderId());
+        logRabbitMessage("ORDER COMPLETION", message.getOrderId());
+        
         try {
+            // Add 5 second delay to allow time to see messages in RabbitMQ Management UI
+            // Thread.sleep(5000);
+            
             orderValidationService.completeOrder(message);
-            logger.info("Order completion processed for order ID: {}", message.getOrderId());
         } catch (Exception e) {
-            logger.error("Error processing order completion for order ID: {}: {}", message.getOrderId(), e.getMessage(), e);
+            logger.error("ERROR in RabbitMQ processing: {}", e.getMessage(), e);
         }
+        
+        logger.info(SEPARATOR);
     }
     
     @RabbitListener(queues = OrderValidationConfig.ORDER_REJECTION_QUEUE)
     public void handleOrderRejection(OrderValidationMessage message) {
-        logger.info("Received order rejection request for order ID: {}", message.getOrderId());
+        logRabbitMessage("ORDER REJECTION", message.getOrderId());
+        
         try {
+            // Add 5 second delay to allow time to see messages in RabbitMQ Management UI
+            // Thread.sleep(5000);
+            
             orderValidationService.rejectOrder(message);
-            logger.info("Order rejection processed for order ID: {}", message.getOrderId());
         } catch (Exception e) {
-            logger.error("Error processing order rejection for order ID: {}: {}", message.getOrderId(), e.getMessage(), e);
+            logger.error("ERROR in RabbitMQ processing: {}", e.getMessage(), e);
         }
+        
+        logger.info(SEPARATOR);
+    }
+    
+    /**
+     * Helper method to log RabbitMQ messages in a formatted, multi-line style
+     */
+    private void logRabbitMessage(String operation, Long orderId) {
+        logger.info(SEPARATOR);
+        logger.info("RABBITMQ: {} ", operation);
+        logger.info("┌─────────────────────────────────────┐");
+        logger.info("│ Operation: {}     │", operation);
+        logger.info("│ Order ID: {}                      │", orderId);
+        logger.info("│ Status: PROCESSING                  │");
+        logger.info("└─────────────────────────────────────┘");
+        logger.info(SEPARATOR);
     }
 } 
