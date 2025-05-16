@@ -51,20 +51,24 @@
         </dependency>
         
         <!-- Jakarta EE API for EJB -->
+        <!-- 
         <dependency>
             <groupId>jakarta.platform</groupId>
             <artifactId>jakarta.jakartaee-api</artifactId>
             <version>${jakartaee.version}</version>
             <scope>provided</scope>
         </dependency>
+        -->
         
         <!-- EJB implementation with Payara Embedded -->
+        <!-- 
         <dependency>
             <groupId>fish.payara.extras</groupId>
             <artifactId>payara-embedded-all</artifactId>
             <version>${payara.version}</version>
             <scope>runtime</scope>
         </dependency>
+        -->
     </dependencies>
 
     <build>
@@ -99,6 +103,12 @@
                     <compilerArgs>
                         <arg>-parameters</arg>
                     </compilerArgs>
+                    <excludes>
+                        <exclude>**/StatefulDishSessionBean.java</exclude>
+                        <exclude>**/DishSessionLocal.java</exclude>
+                        <exclude>**/StatelessDishServiceBean.java</exclude>
+                        <exclude>**/config/EjbConfig.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
         </plugins>

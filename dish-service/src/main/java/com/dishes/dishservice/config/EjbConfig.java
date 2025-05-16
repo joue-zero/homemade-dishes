@@ -2,6 +2,8 @@ package com.dishes.dishservice.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import jakarta.ejb.embeddable.EJBContainer;
 
 import javax.naming.Context;
@@ -15,6 +17,7 @@ import org.slf4j.LoggerFactory;
  * Configuration class to initialize and manage EJB container within Spring Boot application
  */
 @Configuration
+@ConditionalOnProperty(name = "ejb.enabled", havingValue = "true")
 public class EjbConfig {
     private static final Logger logger = LoggerFactory.getLogger(EjbConfig.class);
     

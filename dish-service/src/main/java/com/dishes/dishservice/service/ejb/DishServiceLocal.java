@@ -1,14 +1,12 @@
 package com.dishes.dishservice.service.ejb;
 
 import com.dishes.dishservice.model.Dish;
-import jakarta.ejb.Local;
 
 import java.util.List;
 
 /**
- * Local EJB interface for Dish Service operations
+ * Service interface for Dish operations
  */
-@Local
 public interface DishServiceLocal {
     List<Dish> getAllDishes();
     Dish getDish(Long id);

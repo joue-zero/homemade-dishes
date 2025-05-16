@@ -8,8 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.naming.Context;
-import javax.naming.NamingException;
 import java.util.List;
 
 @RestController
@@ -18,38 +16,21 @@ public class SellerController {
     private static final Logger logger = LoggerFactory.getLogger(SellerController.class);
     
     @Autowired
-    private Context ejbContext;
-    
-    /**
-     * Get DishServiceLocal EJB instance
-     */
-    private DishServiceLocal getDishService() throws NamingException {
-        return (DishServiceLocal) ejbContext.lookup("java:global/dish-service/StatelessDishServiceBean");
-    }
+    private DishServiceLocal dishService;
 
     @GetMapping("/{sellerId}/dishes")
     public ResponseEntity<List<Dish>> getSellerDishes(@PathVariable Long sellerId) {
-        try {
-            List<Dish> dishes = getDishService().getDishesBySeller(sellerId);
-            return ResponseEntity.ok(dishes);
-        } catch (NamingException e) {
-            logger.error("Error looking up EJB: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
+        List<Dish> dishes = dishService.getDishesBySeller(sellerId);
+        return ResponseEntity.ok(dishes);
     }
 
     @PostMapping("/{sellerId}/dishes")
     public ResponseEntity<Dish> createDish(
             @PathVariable Long sellerId, 
             @RequestBody Dish dish) {
-        try {
-            dish.setSellerId(sellerId);
-            Dish createdDish = getDishService().createDish(dish);
-            return ResponseEntity.ok(createdDish);
-        } catch (NamingException e) {
-            logger.error("Error looking up EJB: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
+        dish.setSellerId(sellerId);
+        Dish createdDish = dishService.createDish(dish);
+        return ResponseEntity.ok(createdDish);
     }
 
     @PutMapping("/{sellerId}/dishes/{dishId}")
@@ -57,16 +38,11 @@ public class SellerController {
             @PathVariable Long sellerId, 
             @PathVariable Long dishId, 
             @RequestBody Dish dish) {
-        try {
-            dish.setSellerId(sellerId);
-            dish.setId(dishId); // Ensure ID is set correctly
-            
-            Dish updatedDish = getDishService().updateDish(dish);
-            return ResponseEntity.ok(updatedDish);
-        } catch (NamingException e) {
-            logger.error("Error looking up EJB: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
+        dish.setSellerId(sellerId);
+        dish.setId(dishId); // Ensure ID is set correctly
+        
+        Dish updatedDish = dishService.updateDish(dish);
+        return ResponseEntity.ok(updatedDish);
     }
 
     @PutMapping("/{sellerId}/dishes/{dishId}/availability")
@@ -74,13 +50,8 @@ public class SellerController {
             @PathVariable Long sellerId, 
             @PathVariable Long dishId, 
             @RequestParam boolean available) {
-        try {
-            Dish updatedDish = getDishService().updateAvailability(dishId, available);
-            return ResponseEntity.ok(updatedDish);
-        } catch (NamingException e) {
-            logger.error("Error looking up EJB: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
+        Dish updatedDish = dishService.updateAvailability(dishId, available);
+        return ResponseEntity.ok(updatedDish);
     }
     
     @PutMapping("/{sellerId}/dishes/{dishId}/stock")
@@ -88,12 +59,7 @@ public class SellerController {
             @PathVariable Long sellerId, 
             @PathVariable Long dishId, 
             @RequestParam Integer quantity) {
-        try {
-            Dish updatedDish = getDishService().updateStock(dishId, quantity);
-            return ResponseEntity.ok(updatedDish);
-        } catch (NamingException e) {
-            logger.error("Error looking up EJB: {}", e.getMessage());
-            return ResponseEntity.internalServerError().build();
-        }
+        Dish updatedDish = dishService.updateStock(dishId, quantity);
+        return ResponseEntity.ok(updatedDish);
     }
 } 

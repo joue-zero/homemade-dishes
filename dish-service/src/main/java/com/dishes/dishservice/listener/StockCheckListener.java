@@ -4,134 +4,119 @@ import com.dishes.dishservice.config.RabbitMQConfig;
 import com.dishes.dishservice.dto.OrderValidationMessage;
 import com.dishes.dishservice.model.Dish;
 import com.dishes.dishservice.service.ejb.DishServiceLocal;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-import javax.naming.Context;
-import javax.naming.NamingException;
-
 @Component
+@ConditionalOnProperty(name = "spring.rabbitmq.listener.simple.auto-startup", havingValue = "true")
 public class StockCheckListener {
     private static final Logger logger = LoggerFactory.getLogger(StockCheckListener.class);
-    
-    @Autowired
-    private Context ejbContext;
-    
+
     @Autowired
     private RabbitTemplate rabbitTemplate;
     
-    /**
-     * Get DishServiceLocal EJB instance
-     */
-    private DishServiceLocal getDishService() throws NamingException {
-        return (DishServiceLocal) ejbContext.lookup("java:global/dish-service/StatelessDishServiceBean");
-    }
+    @Autowired
+    private ObjectMapper objectMapper;
     
+    @Autowired
+    private DishServiceLocal dishService;
+
     @RabbitListener(queues = RabbitMQConfig.STOCK_CHECK_QUEUE)
-    public void handleStockCheck(OrderValidationMessage message) {
-        logger.info("Dish service received stock check request for order ID: {}", message.getOrderId());
-        boolean allItemsInStock = true;
-        StringBuilder validationMessageBuilder = new StringBuilder();
-        
+    public void handleStockCheckMessage(String message) {
         try {
-            DishServiceLocal dishService = getDishService();
+            OrderValidationMessage validationMessage = objectMapper.readValue(message, OrderValidationMessage.class);
+            logger.info("Processing stock check for order: {}", validationMessage.getOrderId());
             
-            for (OrderValidationMessage.OrderItemInfo item : message.getItems()) {
+            boolean allItemsAvailable = true;
+            StringBuilder issueDetails = new StringBuilder();
+            
+            // Check each order item
+            for (OrderValidationMessage.OrderItem item : validationMessage.getItems()) {
                 try {
                     Dish dish = dishService.getDish(item.getDishId());
                     
-                    if (dish == null) {
-                        logger.error("Dish not found: {}", item.getDishId());
-                        allItemsInStock = false;
-                        validationMessageBuilder.append("Dish not found: ").append(item.getDishId()).append("; ");
-                        continue;
-                    }
-                    
                     if (!dish.getAvailable()) {
-                        logger.error("Dish not available: {}", dish.getName());
-                        allItemsInStock = false;
-                        validationMessageBuilder.append("Dish not available: ").append(dish.getName()).append("; ");
+                        allItemsAvailable = false;
+                        issueDetails.append("Dish ").append(dish.getName())
+                                .append(" (ID: ").append(dish.getId()).append(") is not available. ");
                         continue;
                     }
                     
-                    if (dish.getQuantity() == null || dish.getQuantity() < item.getQuantity()) {
-                        logger.error("Insufficient stock for dish: {}. Requested: {}, Available: {}", 
-                            dish.getName(), item.getQuantity(), dish.getQuantity());
-                        allItemsInStock = false;
-                        validationMessageBuilder.append("Insufficient stock for dish: ").append(dish.getName())
-                            .append(". Requested: ").append(item.getQuantity())
-                            .append(", Available: ").append(dish.getQuantity()).append("; ");
+                    if (dish.getQuantity() < item.getQuantity()) {
+                        allItemsAvailable = false;
+                        issueDetails.append("Dish ").append(dish.getName())
+                                .append(" (ID: ").append(dish.getId()).append(") has only ")
+                                .append(dish.getQuantity()).append(" items available, but ")
+                                .append(item.getQuantity()).append(" were requested. ");
                     }
                 } catch (Exception e) {
-                    logger.error("Error checking stock for dish: {}", item.getDishId(), e);
-                    allItemsInStock = false;
-                    validationMessageBuilder.append("Error checking dish: ").append(item.getDishId())
-                        .append(" - ").append(e.getMessage()).append("; ");
+                    allItemsAvailable = false;
+                    issueDetails.append("Error checking dish ").append(item.getDishId())
+                            .append(": ").append(e.getMessage()).append(". ");
                 }
             }
-        } catch (NamingException e) {
-            logger.error("Error looking up EJB: {}", e.getMessage());
-            allItemsInStock = false;
-            validationMessageBuilder.append("Service error: ").append(e.getMessage());
-        }
-        
-        message.setStockAvailable(allItemsInStock);
-        message.setValidationMessage(validationMessageBuilder.toString());
-        
-        // Send the result back to the same queue for the order service to pick up
-        // The order service will handle the next steps based on this result
-        if (allItemsInStock) {
-            logger.info("Stock check passed, forwarding to payment validation");
+            
+            // Prepare response
+            validationMessage.setValid(allItemsAvailable);
+            validationMessage.setIssue(issueDetails.toString());
+            
+            // Send response back
             rabbitTemplate.convertAndSend(
-                RabbitMQConfig.ORDER_VALIDATION_EXCHANGE,
-                RabbitMQConfig.PAYMENT_VALIDATION_ROUTING_KEY,
-                message
-            );
-        } else {
-            logger.info("Stock check failed, forwarding to order rejection");
-            rabbitTemplate.convertAndSend(
-                RabbitMQConfig.ORDER_VALIDATION_EXCHANGE,
-                RabbitMQConfig.ORDER_REJECTION_ROUTING_KEY,
-                message
-            );
+                RabbitMQConfig.ORDER_VALIDATION_EXCHANGE, 
+                allItemsAvailable ? RabbitMQConfig.PAYMENT_VALIDATION_ROUTING_KEY : RabbitMQConfig.ORDER_REJECTION_ROUTING_KEY, 
+                objectMapper.writeValueAsString(validationMessage));
+            
+            logger.info("Stock check completed for order {}: {}", validationMessage.getOrderId(), 
+                        allItemsAvailable ? "VALID" : "INVALID");
+            
+        } catch (Exception e) {
+            logger.error("Error processing stock check message", e);
         }
     }
     
     @RabbitListener(queues = RabbitMQConfig.ORDER_COMPLETION_QUEUE)
-    public void handleOrderCompletion(OrderValidationMessage message) {
-        logger.info("Dish service received order completion for order ID: {}", message.getOrderId());
-        
+    public void handleOrderConfirmedMessage(String message) {
         try {
-            DishServiceLocal dishService = getDishService();
+            OrderValidationMessage validationMessage = objectMapper.readValue(message, OrderValidationMessage.class);
+            logger.info("Processing stock update for confirmed order: {}", validationMessage.getOrderId());
             
-            // Update inventory by reducing quantities
-            for (OrderValidationMessage.OrderItemInfo item : message.getItems()) {
+            // Update stock for each ordered item
+            for (OrderValidationMessage.OrderItem item : validationMessage.getItems()) {
                 try {
+                    // Get the dish
                     Dish dish = dishService.getDish(item.getDishId());
                     
-                    if (dish != null && dish.getQuantity() != null) {
-                        // Update dish quantity
-                        int newQuantity = dish.getQuantity() - item.getQuantity();
-                        dish.setQuantity(newQuantity);
-                        
-                        // If new quantity is 0, mark as unavailable
-                        if (newQuantity <= 0) {
-                            dish.setAvailable(false);
-                        }
-                        
-                        // Update dish
-                        dishService.updateDish(dish);
+                    // Calculate new quantity
+                    int newQuantity = dish.getQuantity() - item.getQuantity();
+                    if (newQuantity < 0) {
+                        newQuantity = 0;
                     }
+                    
+                    // Update dish quantity
+                    dish.setQuantity(newQuantity);
+                    
+                    // If quantity is zero, mark as unavailable
+                    if (newQuantity == 0) {
+                        dish.setAvailable(false);
+                    }
+                    
+                    // Save the updated dish
+                    dishService.updateDish(dish);
+                    
+                    logger.info("Updated stock for dish {}: new quantity = {}", dish.getId(), newQuantity);
                 } catch (Exception e) {
-                    logger.error("Error updating inventory for dish: {}", item.getDishId(), e);
+                    logger.error("Error updating stock for dish {}: {}", item.getDishId(), e.getMessage());
                 }
             }
-        } catch (NamingException e) {
-            logger.error("Error looking up EJB: {}", e.getMessage());
+            
+        } catch (Exception e) {
+            logger.error("Error processing order confirmed message", e);
         }
     }
 } 
