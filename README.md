@@ -48,6 +48,19 @@ A simplified version of an online platform for home-made dishes using Java, Rabb
 - Place orders
 - Basic order notifications via RabbitMQ
 
+## Advanced Messaging Features
+
+The platform uses RabbitMQ for the following messaging patterns:
+
+### Direct Exchange
+- Payment failure notifications to admins using direct exchange with `payment.failed` routing key
+- Only payment failure events are routed to the admin notification queue
+
+### Topic Exchange
+- Centralized logging system using a topic exchange named `log.exchange`
+- Each service publishes logs with routing keys in the format `ServiceName_Severity` (e.g., `Order_ERROR`, `Dish_INFO`)
+- Admin notifications are subscribed only to error logs using the wildcard pattern `*_Error`
+
 ## Note
 
 This is a simplified version for learning purposes. Some advanced features like shipping companies and complex error handling are not implemented. 

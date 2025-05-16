@@ -1,4 +1,5 @@
 # Stop any running Java processes (Spring Boot applications)
+
 Write-Host "Stopping any running services..." -ForegroundColor Yellow
 Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force
 
@@ -15,7 +16,7 @@ function BuildAndRunService {
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Starting $serviceName on port $port..." -ForegroundColor Green
-        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$serviceName'; mvn spring-boot:run"
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\$serviceName'; mvn spring-boot:run"
         Start-Sleep -Seconds 5  # Wait for service to start
     } else {
         Write-Host "Failed to build $serviceName" -ForegroundColor Red

@@ -1,5 +1,6 @@
 package com.dishes.orderservice.service;
 
+import com.dishes.orderservice.config.NotificationConfig;
 import com.dishes.orderservice.config.OrderValidationConfig;
 import com.dishes.orderservice.dto.DishDTO;
 import com.dishes.orderservice.dto.OrderValidationMessage;
@@ -33,6 +34,9 @@ public class OrderValidationService {
 
     @Autowired
     private RestTemplate restTemplate;
+    
+    @Autowired
+    private LoggingService loggingService;
 
     @Value("${order.minimum.charge:10.0}")
     private BigDecimal minimumOrderCharge;
@@ -223,6 +227,16 @@ public class OrderValidationService {
                 .append("; ");
             logger.info("Order amount ${} is below minimum charge of ${}", 
                 message.getTotalAmount(), minimumOrderCharge);
+            
+            // Send payment failure notification to admin via direct exchange
+            rabbitTemplate.convertAndSend(
+                NotificationConfig.PAYMENT_EXCHANGE,
+                NotificationConfig.PAYMENT_FAILED_ROUTING_KEY,
+                "Order " + message.getOrderId() + " failed: Amount below minimum charge"
+            );
+            
+            // Log error using the logging service
+            loggingService.logError("Payment validation failed: Order amount below minimum");
         }
         
         // Check if user has sufficient balance
@@ -239,6 +253,16 @@ public class OrderValidationService {
                 logger.error("Could not retrieve balance for user ID: {}", customerId);
                 paymentValid = false;
                 validationMessageBuilder.append("Could not validate user balance; ");
+                
+                // Send payment failure notification to admin
+                rabbitTemplate.convertAndSend(
+                    NotificationConfig.PAYMENT_EXCHANGE,
+                    NotificationConfig.PAYMENT_FAILED_ROUTING_KEY,
+                    "Order " + message.getOrderId() + " failed: Could not validate user balance"
+                );
+                
+                // Log error
+                loggingService.logError("Payment validation failed: Could not validate user balance for user " + customerId);
             } else if (userBalance.compareTo(orderAmount) < 0) {
                 logger.error("Insufficient balance: User {} has ${} but order requires ${}", 
                     customerId, userBalance, orderAmount);
@@ -248,9 +272,22 @@ public class OrderValidationService {
                     .append(" but the order requires $")
                     .append(orderAmount)
                     .append("; ");
+                
+                // Send payment failure notification to admin
+                rabbitTemplate.convertAndSend(
+                    NotificationConfig.PAYMENT_EXCHANGE,
+                    NotificationConfig.PAYMENT_FAILED_ROUTING_KEY,
+                    "Order " + message.getOrderId() + " failed: Insufficient balance for user " + customerId
+                );
+                
+                // Log error
+                loggingService.logError("Payment validation failed: Insufficient balance for user " + customerId);
             } else {
                 logger.info("User {} has sufficient balance: ${} for order amount: ${}", 
                     customerId, userBalance, orderAmount);
+                
+                // Log info
+                loggingService.logInfo("Payment validation successful for order " + message.getOrderId());
             }
         } catch (Exception e) {
             logger.error("Error checking user balance: {}", e.getMessage(), e);
@@ -258,6 +295,16 @@ public class OrderValidationService {
             validationMessageBuilder.append("Error checking user balance: ")
                 .append(e.getMessage())
                 .append("; ");
+            
+            // Send payment failure notification to admin
+            rabbitTemplate.convertAndSend(
+                NotificationConfig.PAYMENT_EXCHANGE,
+                NotificationConfig.PAYMENT_FAILED_ROUTING_KEY,
+                "Order " + message.getOrderId() + " failed: Error checking user balance - " + e.getMessage()
+            );
+            
+            // Log error
+            loggingService.logError("Payment validation error: " + e.getMessage());
         }
         
         // Additional payment validations can be added here
@@ -359,6 +406,19 @@ public class OrderValidationService {
         
         if (!message.isPaymentValidated()) {
             order.setPaymentStatus(Order.PaymentStatus.FAILED);
+            
+            // Log error
+            loggingService.logError("Order " + order.getId() + " rejected due to payment failure: " + message.getValidationMessage());
+            
+            // Send payment failure notification to admin via direct exchange
+            rabbitTemplate.convertAndSend(
+                NotificationConfig.PAYMENT_EXCHANGE,
+                NotificationConfig.PAYMENT_FAILED_ROUTING_KEY,
+                "Order " + order.getId() + " payment failed: " + message.getValidationMessage()
+            );
+        } else {
+            // Log warning
+            loggingService.logWarning("Order " + order.getId() + " rejected: " + message.getValidationMessage());
         }
         
         orderService.createOrder(order); // Save updated order
