@@ -21,6 +21,8 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <jakartaee.version>10.0.0</jakartaee.version>
+        <payara.version>6.2023.11</payara.version>
     </properties>
 
     <dependencies>
@@ -46,6 +48,22 @@
             <artifactId>lombok</artifactId>
             <version>${lombok.version}</version>
             <scope>provided</scope>
+        </dependency>
+        
+        <!-- Jakarta EE API for EJB -->
+        <dependency>
+            <groupId>jakarta.platform</groupId>
+            <artifactId>jakarta.jakartaee-api</artifactId>
+            <version>${jakartaee.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        
+        <!-- EJB implementation with Payara Embedded -->
+        <dependency>
+            <groupId>fish.payara.extras</groupId>
+            <artifactId>payara-embedded-all</artifactId>
+            <version>${payara.version}</version>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 

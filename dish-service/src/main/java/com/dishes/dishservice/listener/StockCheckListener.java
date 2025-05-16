@@ -3,7 +3,7 @@ package com.dishes.dishservice.listener;
 import com.dishes.dishservice.config.RabbitMQConfig;
 import com.dishes.dishservice.dto.OrderValidationMessage;
 import com.dishes.dishservice.model.Dish;
-import com.dishes.dishservice.service.DishService;
+import com.dishes.dishservice.service.ejb.DishServiceLocal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -11,15 +11,25 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import javax.naming.Context;
+import javax.naming.NamingException;
+
 @Component
 public class StockCheckListener {
     private static final Logger logger = LoggerFactory.getLogger(StockCheckListener.class);
     
     @Autowired
-    private DishService dishService;
+    private Context ejbContext;
     
     @Autowired
     private RabbitTemplate rabbitTemplate;
+    
+    /**
+     * Get DishServiceLocal EJB instance
+     */
+    private DishServiceLocal getDishService() throws NamingException {
+        return (DishServiceLocal) ejbContext.lookup("java:global/dish-service/StatelessDishServiceBean");
+    }
     
     @RabbitListener(queues = RabbitMQConfig.STOCK_CHECK_QUEUE)
     public void handleStockCheck(OrderValidationMessage message) {
@@ -27,38 +37,46 @@ public class StockCheckListener {
         boolean allItemsInStock = true;
         StringBuilder validationMessageBuilder = new StringBuilder();
         
-        for (OrderValidationMessage.OrderItemInfo item : message.getItems()) {
-            try {
-                Dish dish = dishService.getDish(item.getDishId());
-                
-                if (dish == null) {
-                    logger.error("Dish not found: {}", item.getDishId());
+        try {
+            DishServiceLocal dishService = getDishService();
+            
+            for (OrderValidationMessage.OrderItemInfo item : message.getItems()) {
+                try {
+                    Dish dish = dishService.getDish(item.getDishId());
+                    
+                    if (dish == null) {
+                        logger.error("Dish not found: {}", item.getDishId());
+                        allItemsInStock = false;
+                        validationMessageBuilder.append("Dish not found: ").append(item.getDishId()).append("; ");
+                        continue;
+                    }
+                    
+                    if (!dish.getAvailable()) {
+                        logger.error("Dish not available: {}", dish.getName());
+                        allItemsInStock = false;
+                        validationMessageBuilder.append("Dish not available: ").append(dish.getName()).append("; ");
+                        continue;
+                    }
+                    
+                    if (dish.getQuantity() == null || dish.getQuantity() < item.getQuantity()) {
+                        logger.error("Insufficient stock for dish: {}. Requested: {}, Available: {}", 
+                            dish.getName(), item.getQuantity(), dish.getQuantity());
+                        allItemsInStock = false;
+                        validationMessageBuilder.append("Insufficient stock for dish: ").append(dish.getName())
+                            .append(". Requested: ").append(item.getQuantity())
+                            .append(", Available: ").append(dish.getQuantity()).append("; ");
+                    }
+                } catch (Exception e) {
+                    logger.error("Error checking stock for dish: {}", item.getDishId(), e);
                     allItemsInStock = false;
-                    validationMessageBuilder.append("Dish not found: ").append(item.getDishId()).append("; ");
-                    continue;
+                    validationMessageBuilder.append("Error checking dish: ").append(item.getDishId())
+                        .append(" - ").append(e.getMessage()).append("; ");
                 }
-                
-                if (!dish.getAvailable()) {
-                    logger.error("Dish not available: {}", dish.getName());
-                    allItemsInStock = false;
-                    validationMessageBuilder.append("Dish not available: ").append(dish.getName()).append("; ");
-                    continue;
-                }
-                
-                if (dish.getQuantity() == null || dish.getQuantity() < item.getQuantity()) {
-                    logger.error("Insufficient stock for dish: {}. Requested: {}, Available: {}", 
-                        dish.getName(), item.getQuantity(), dish.getQuantity());
-                    allItemsInStock = false;
-                    validationMessageBuilder.append("Insufficient stock for dish: ").append(dish.getName())
-                        .append(". Requested: ").append(item.getQuantity())
-                        .append(", Available: ").append(dish.getQuantity()).append("; ");
-                }
-            } catch (Exception e) {
-                logger.error("Error checking stock for dish: {}", item.getDishId(), e);
-                allItemsInStock = false;
-                validationMessageBuilder.append("Error checking dish: ").append(item.getDishId())
-                    .append(" - ").append(e.getMessage()).append("; ");
             }
+        } catch (NamingException e) {
+            logger.error("Error looking up EJB: {}", e.getMessage());
+            allItemsInStock = false;
+            validationMessageBuilder.append("Service error: ").append(e.getMessage());
         }
         
         message.setStockAvailable(allItemsInStock);
@@ -87,27 +105,33 @@ public class StockCheckListener {
     public void handleOrderCompletion(OrderValidationMessage message) {
         logger.info("Dish service received order completion for order ID: {}", message.getOrderId());
         
-        // Update inventory by reducing quantities
-        for (OrderValidationMessage.OrderItemInfo item : message.getItems()) {
-            try {
-                Dish dish = dishService.getDish(item.getDishId());
-                
-                if (dish != null && dish.getQuantity() != null) {
-                    // Update dish quantity
-                    int newQuantity = dish.getQuantity() - item.getQuantity();
-                    dish.setQuantity(newQuantity);
+        try {
+            DishServiceLocal dishService = getDishService();
+            
+            // Update inventory by reducing quantities
+            for (OrderValidationMessage.OrderItemInfo item : message.getItems()) {
+                try {
+                    Dish dish = dishService.getDish(item.getDishId());
                     
-                    // If new quantity is 0, mark as unavailable
-                    if (newQuantity <= 0) {
-                        dish.setAvailable(false);
+                    if (dish != null && dish.getQuantity() != null) {
+                        // Update dish quantity
+                        int newQuantity = dish.getQuantity() - item.getQuantity();
+                        dish.setQuantity(newQuantity);
+                        
+                        // If new quantity is 0, mark as unavailable
+                        if (newQuantity <= 0) {
+                            dish.setAvailable(false);
+                        }
+                        
+                        // Update dish
+                        dishService.updateDish(dish);
                     }
-                    
-                    // Update dish
-                    dishService.updateDish(dish);
+                } catch (Exception e) {
+                    logger.error("Error updating inventory for dish: {}", item.getDishId(), e);
                 }
-            } catch (Exception e) {
-                logger.error("Error updating inventory for dish: {}", item.getDishId(), e);
             }
+        } catch (NamingException e) {
+            logger.error("Error looking up EJB: {}", e.getMessage());
         }
     }
 } 
