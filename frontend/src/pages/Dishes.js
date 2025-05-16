@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { dishService } from '../services/dishService';
 import Cart from '../components/Cart';
+import { getRandomFoodImage } from '../utils/foodImages';
 import './Dishes.css';
 
 const Dishes = () => {
@@ -24,7 +25,8 @@ const Dishes = () => {
         description: dish.description,
         price: dish.price,
         category: dish.category,
-        imageUrl: dish.imageUrl,
+        // Always use random food images, ignoring backend URLs
+        imageUrl: getRandomFoodImage(),
         available: dish.available,
         companyId: dish.company?.id,
         companyName: dish.company?.name
@@ -63,7 +65,8 @@ const Dishes = () => {
         dishId: dish.id,
         name: dish.name,
         price: dish.price,
-        quantity: 1
+        quantity: 1,
+        imageUrl: dish.imageUrl
       }];
     });
   };
@@ -83,9 +86,7 @@ const Dishes = () => {
           {dishes && dishes.length > 0 ? (
             dishes.map(dish => (
               <div key={dish.id} className="dish-card">
-                {dish.imageUrl && (
-                  <img src={dish.imageUrl} alt={dish.name} className="dish-image" />
-                )}
+                <img src={dish.imageUrl} alt={dish.name} className="dish-image" />
                 <div className="dish-info">
                   <h3>{dish.name}</h3>
                   <p className="dish-description">{dish.description}</p>

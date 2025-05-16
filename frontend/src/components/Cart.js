@@ -2,13 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { orderService } from '../services/orderService';
 import './Cart.css';
 
+// Import the same food images array for consistency
+import { foodImages, getRandomFoodImage } from '../utils/foodImages';
+
 const Cart = ({ items, onOrderComplete }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [cartItems, setCartItems] = useState([]);
 
     useEffect(() => {
-        setCartItems(items);
+        // Ensure each item has an image
+        const itemsWithImages = items.map(item => ({
+            ...item,
+            imageUrl: item.imageUrl || getRandomFoodImage()
+        }));
+        setCartItems(itemsWithImages);
     }, [items]);
 
     const handleQuantityChange = (dishId, change) => {
@@ -69,6 +77,9 @@ const Cart = ({ items, onOrderComplete }) => {
             <div className="cart-items">
                 {cartItems.map(item => (
                     <div key={item.dishId} className="cart-item">
+                        <div className="item-image">
+                            <img src={item.imageUrl} alt={item.name} />
+                        </div>
                         <div className="item-info">
                             <h3>{item.name}</h3>
                             <p className="item-price">${item.price.toFixed(2)}</p>
